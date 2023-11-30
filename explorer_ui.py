@@ -95,7 +95,7 @@ class MainApplication(tk.Frame):
         if len([i for i in overlapping if i is True]) > 1:
             tk.messagebox.showwarning(
                 title=APP_TITTLE,
-                message="You selection cannot overlap with multiple QRS complexes",
+                message="Your selection cannot overlap with multiple QRS complexes",
             )
             return
 
