@@ -24,10 +24,18 @@ class ECGLead:
         return f"\n{self.label}: \n\tunits: {self.units} \n\tsampling: {self.fs}Hz \n\tdata: {self.waveform}\n"
 
     def calculate_qrs_lengths(self):
-        return [(pos.offset - pos.onset)/self.fs*1000 for pos in self.ann.qrs_complex_positions or []]
+        return [
+            (pos.offset - pos.onset) / self.fs * 1000
+            for pos in self.ann.qrs_complex_positions or []
+        ]
 
     def calculate_qrs_areas(self):
-        return [np.round(np.trapz(np.abs(self.raw_waveform[pos.onset:pos.offset])), decimals=2) for pos in self.ann.qrs_complex_positions or []]
+        return [
+            np.round(
+                np.trapz(np.abs(self.raw_waveform[pos.onset : pos.offset])), decimals=2
+            )
+            for pos in self.ann.qrs_complex_positions or []
+        ]
 
 
 class ECGContainer:
@@ -36,7 +44,8 @@ class ECGContainer:
         self.raw: Any = raw
 
     @property
-    def n_leads(self): return len(self.ecg_leads)
+    def n_leads(self):
+        return len(self.ecg_leads)
 
     @classmethod
     def from_dicom_file(cls, path: str):
@@ -59,7 +68,9 @@ class ECGContainer:
                 units = channel.ChannelSensitivityUnitsSequence[0].CodeMeaning
 
             leads.append(
-                ECGLead(label, waveform_data[:, ii], None, units, waveform.SamplingFrequency)
+                ECGLead(
+                    label, waveform_data[:, ii], None, units, waveform.SamplingFrequency
+                )
             )
 
         return cls(leads, raw)

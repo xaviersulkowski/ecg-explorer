@@ -14,7 +14,6 @@ class ECGExplorer:
 
     @classmethod
     def load_from_file(cls, filepath: str):
-
         if not os.path.isfile(filepath):
             raise FileNotFoundError()
 
@@ -39,6 +38,8 @@ class ECGExplorer:
             column_root = lead.label.lower().replace(" ", "_")
 
             report[f"{column_root}_width_ms"] = pd.Series(lead.calculate_qrs_lengths())
-            report[f"{column_root}_abs_area_mV^2"] = pd.Series(lead.calculate_qrs_areas())
+            report[f"{column_root}_abs_area_mV^2"] = pd.Series(
+                lead.calculate_qrs_areas()
+            )
 
         return report

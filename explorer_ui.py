@@ -46,7 +46,7 @@ class MainApplication(tk.Frame):
             self,
             self.selected_lead_name,
             *list(self.leads_mapping.keys()),
-            command=self.on_lead_change
+            command=self.on_lead_change,
         )
 
         self.top_frame.pack(anchor=tk.NW)
@@ -57,20 +57,19 @@ class MainApplication(tk.Frame):
         span = SpanSelector(
             self.ax,
             self.select_span,
-            'horizontal',
+            "horizontal",
             useblit=True,
-            props=dict(alpha=0.5, facecolor='red'),
-            interactive=True
+            props=dict(alpha=0.5, facecolor="red"),
+            interactive=True,
         )
 
         self.selected_span_x_coordinates = None
 
-        self.canvas.mpl_connect('key_press_event', self.handle_key_press_event)
-        self.canvas.mpl_connect('pick_event', span)
-        self.canvas.mpl_connect('button_press_event', self.highlight_span)
+        self.canvas.mpl_connect("key_press_event", self.handle_key_press_event)
+        self.canvas.mpl_connect("pick_event", span)
+        self.canvas.mpl_connect("button_press_event", self.highlight_span)
 
     def select_span(self, onset, offset):
-
         def overlaps(on1, off1, on2, off2):
             if off1 < on2:
                 return False
@@ -88,22 +87,28 @@ class MainApplication(tk.Frame):
             return
 
         # find overlapping QRS with selected span
-        overlapping = [True if overlaps(onset, offset, x.onset, x.offset) is True else False for x in
-                       self.selected_lead.ann.qrs_complex_positions]
+        overlapping = [
+            True if overlaps(onset, offset, x.onset, x.offset) is True else False
+            for x in self.selected_lead.ann.qrs_complex_positions
+        ]
 
         if len([i for i in overlapping if i is True]) > 1:
             tk.messagebox.showwarning(
                 title=APP_TITTLE,
-                message="You selection cannot overlap with multiple QRS complexes"
+                message="You selection cannot overlap with multiple QRS complexes",
             )
             return
 
         if not any(overlapping):
             # just add selection
-            self.selected_lead.ann.qrs_complex_positions.append(QRSComplex(onset, offset))
+            self.selected_lead.ann.qrs_complex_positions.append(
+                QRSComplex(onset, offset)
+            )
         else:
             # update existing QRS complex
-            self.selected_lead.ann.qrs_complex_positions[overlapping.index(True)] = QRSComplex(onset, offset)
+            self.selected_lead.ann.qrs_complex_positions[
+                overlapping.index(True)
+            ] = QRSComplex(onset, offset)
 
         self.draw_annotations()
 
@@ -118,7 +123,7 @@ class MainApplication(tk.Frame):
 
     def _init_canvas(self):
         fig, ax = plt.subplots()
-        line, = ax.plot([], [])
+        (line,) = ax.plot([], [])
         canvas = FigureCanvasTkAgg(fig, self)
         NavigationToolbar2Tk(canvas)
         ax.grid()
@@ -131,8 +136,12 @@ class MainApplication(tk.Frame):
         self.explorer = ECGExplorer.load_from_file(filename)
         self.container = self.explorer.container
 
-        self.leads_mapping = {x.label: cnt for cnt, x in enumerate(self.container.ecg_leads)}
-        self.leads_menu.set_menu(list(self.leads_mapping.values())[0], *list(self.leads_mapping.keys()))
+        self.leads_mapping = {
+            x.label: cnt for cnt, x in enumerate(self.container.ecg_leads)
+        }
+        self.leads_menu.set_menu(
+            list(self.leads_mapping.values())[0], *list(self.leads_mapping.keys())
+        )
         self.selected_lead_name.set(list(self.leads_mapping.keys())[0])
         self.selected_lead = self._get_lead(self.selected_lead_name.get())
 
@@ -144,16 +153,15 @@ class MainApplication(tk.Frame):
 
     def process_signal(self):
         self.explorer.process()
-        showinfo(
-            title=APP_TITTLE,
-            message="Processing done!"
-        )
+        showinfo(title=APP_TITTLE, message="Processing done!")
         self.top_frame.r2.configure(state=tk.NORMAL)
         self.draw_annotations()
 
     def generate_report(self):
         df = self.explorer.generate_report()
-        filename = fd.asksaveasfile(mode='w', initialfile=f"untitled.csv", defaultextension=".csv")
+        filename = fd.asksaveasfile(
+            mode="w", initialfile=f"untitled.csv", defaultextension=".csv"
+        )
 
         if filename is None:
             return
@@ -161,14 +169,15 @@ class MainApplication(tk.Frame):
         df.to_csv(filename)
 
         showinfo(
-            title=APP_TITTLE,
-            message=f"Report generated and saved to {filename.name}"
+            title=APP_TITTLE, message=f"Report generated and saved to {filename.name}"
         )
 
     def init_plot(self):
         lead = self.selected_lead
 
-        waveform = lead.waveform if self.show_processed_signal.get() else lead.raw_waveform
+        waveform = (
+            lead.waveform if self.show_processed_signal.get() else lead.raw_waveform
+        )
         x = np.arange(0, len(waveform), int(len(waveform) / 100))
         x_ticks = x / lead.fs * 1000
 
@@ -187,13 +196,14 @@ class MainApplication(tk.Frame):
 
     def update_waveform(self):
         lead = self.selected_lead
-        waveform = lead.waveform if self.show_processed_signal.get() is True else lead.raw_waveform
+        waveform = (
+            lead.waveform
+            if self.show_processed_signal.get() is True
+            else lead.raw_waveform
+        )
 
         if waveform is None:
-            showwarning(
-                title=APP_TITTLE,
-                message="Process the signal first!"
-            )
+            showwarning(title=APP_TITTLE, message="Process the signal first!")
             return
 
         self.line.set_data(range(len(waveform)), waveform)
@@ -201,19 +211,34 @@ class MainApplication(tk.Frame):
 
     def draw_annotations(self):
         if not self.selected_lead.ann.is_empty:
-
             self.clear_annotations()
 
             onsets = [i.onset for i in self.selected_lead.ann.qrs_complex_positions]
             offsets = [i.offset for i in self.selected_lead.ann.qrs_complex_positions]
 
             for on, off in zip(onsets, offsets):
-
                 span_selected = False
                 if self.selected_span_x_coordinates is not None:
-                    span_selected = True if on < (self.selected_span_x_coordinates / 1000 * self.selected_lead.fs) < off else False
+                    span_selected = (
+                        True
+                        if on
+                        < (
+                            self.selected_span_x_coordinates
+                            / 1000
+                            * self.selected_lead.fs
+                        )
+                        < off
+                        else False
+                    )
 
-                self.spans.append(self.ax.axvspan(on, off, facecolor=(0, 1, 0, 0.5) if span_selected else (1, 0, 0, 0.5), lw=2))
+                self.spans.append(
+                    self.ax.axvspan(
+                        on,
+                        off,
+                        facecolor=(0, 1, 0, 0.5) if span_selected else (1, 0, 0, 0.5),
+                        lw=2,
+                    )
+                )
 
             self.canvas.draw()
 
@@ -228,7 +253,7 @@ class MainApplication(tk.Frame):
             self.draw_annotations()
 
     def handle_key_press_event(self, event: KeyEvent):
-        if event.key == 'ctrl+d' and self.selected_span_x_coordinates is not None:
+        if event.key == "ctrl+d" and self.selected_span_x_coordinates is not None:
             self._delete_selected_span()
 
     def _delete_selected_span(self):
@@ -256,10 +281,7 @@ class TopFrame(tk.Frame):
         self.radio_button_frame = tk.Frame(self)
 
         self.open_button = tk.Button(
-            self,
-            text="Select ECG file",
-            command=self._select_file,
-            bg='ivory4'
+            self, text="Select ECG file", command=self._select_file, bg="ivory4"
         )
 
         self.process_ecg_button = tk.Button(
@@ -275,7 +297,7 @@ class TopFrame(tk.Frame):
             variable=self.parent.show_processed_signal,
             value=False,
             command=self._on_radio_change,
-            state=tk.DISABLED
+            state=tk.DISABLED,
         )
         self.r1.pack(anchor=tk.NW)
 
@@ -285,7 +307,7 @@ class TopFrame(tk.Frame):
             variable=self.parent.show_processed_signal,
             value=True,
             command=self._on_radio_change,
-            state=tk.DISABLED
+            state=tk.DISABLED,
         )
         self.r2.pack(anchor=tk.NW)
 
@@ -297,27 +319,17 @@ class TopFrame(tk.Frame):
         self.parent.update_waveform()
 
     def _select_file(self):
-        filetypes = (
-            ('Dicom files', '*.dcm'),
-        )
+        filetypes = (("Dicom files", "*.dcm"),)
 
         filename = fd.askopenfilename(
-            title='Open a file',
-            initialdir='./',
-            filetypes=filetypes
+            title="Open a file", initialdir="./", filetypes=filetypes
         )
 
         if filename is None or filename == "" or filename == ():
-            showinfo(
-                title=APP_TITTLE,
-                message="File not selected"
-            )
+            showinfo(title=APP_TITTLE, message="File not selected")
             return
 
-        showinfo(
-            title=APP_TITTLE,
-            message="Successfully loaded file!"
-        )
+        showinfo(title=APP_TITTLE, message="Successfully loaded file!")
 
         self.parent.load_signal(filename)
 
@@ -349,7 +361,7 @@ class BottomFrame(tk.Frame):
             self,
             text="Quit",
             command=self.parent.exit_main,
-            bg='ivory4',
+            bg="ivory4",
         )
 
         self.quit.grid(row=1, column=1, padx=20, pady=20, sticky=tk.E)
