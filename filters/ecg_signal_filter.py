@@ -18,7 +18,7 @@ class BandPassEcgSignalFilter:
 
     def _do_filter(self, lead: ECGLead):
         fs = lead.fs
-        ecg_signal = lead.waveform
+        ecg_signal = lead.raw_waveform
 
         filtered = self._bandpass_filtering(
             ecg_signal,
