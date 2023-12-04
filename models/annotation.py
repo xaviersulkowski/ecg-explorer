@@ -19,3 +19,11 @@ class Annotation:
     @property
     def is_empty(self):
         return self.r_peak_positions is None or len(self.r_peak_positions) == 0
+
+    @property
+    def onsets(self):
+        return [i.onset for i in self.qrs_complex_positions]
+
+    @property
+    def offsets(self):
+        return [i.offset for i in self.qrs_complex_positions]

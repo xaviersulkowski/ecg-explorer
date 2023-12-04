@@ -3,7 +3,9 @@ import pandas as pd
 
 from detectors.qrs_detectors import PanTompkinsDetector
 from filters.ecg_signal_filter import BandPassEcgSignalFilter
-from models.ecg import ECGContainer
+from models.annotation import QRSComplex
+from models.ecg import ECGContainer, LeadName
+from models.span import Span
 
 
 class ECGExplorer:
@@ -31,15 +33,34 @@ class ECGExplorer:
         # TODO: check if processed
         return self._container
 
+    def update_annotations_from_spans(self, lead_name: LeadName, spans: list[Span]):
+        lead = self._container.get_lead(lead_name)
+        if lead:
+            lead.ann.qrs_complex_positions = [
+                QRSComplex(span.onset, span.offset) for span in spans
+            ]
+
     def generate_report(self) -> pd.DataFrame:
+        def _padded(data: list, size: int) -> list:
+            out = [None] * size
+            for cnt, l in enumerate(data):
+                out[cnt] = l
+            return out
+
         report = pd.DataFrame()
+
+        max_size = max(
+            len(lead.ann.qrs_complex_positions) for lead in self._container.ecg_leads
+        )
 
         for lead in self._container.ecg_leads:
             column_root = lead.label.lower().replace(" ", "_")
 
-            report[f"{column_root}_width_ms"] = pd.Series(lead.calculate_qrs_lengths())
+            report[f"{column_root}_width_ms"] = pd.Series(
+                _padded(lead.calculate_qrs_lengths(), max_size)
+            )
             report[f"{column_root}_abs_area_mV^2"] = pd.Series(
-                lead.calculate_qrs_areas()
+                _padded(lead.calculate_qrs_areas(), max_size)
             )
 
         return report

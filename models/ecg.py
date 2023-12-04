@@ -4,14 +4,16 @@ import numpy as np
 import pydicom as dicom
 
 from dataclasses import dataclass, field
-from typing import Any, Optional, Collection
+from typing import Any, Optional, Collection, TypeAlias
 
 from models.annotation import Annotation
+
+LeadName: TypeAlias = str
 
 
 @dataclass
 class ECGLead:
-    label: str
+    label: LeadName
     raw_waveform: np.ndarray[float]
     waveform: Optional[np.ndarray[float]] = None
     units: Optional[str] = None
@@ -46,6 +48,13 @@ class ECGContainer:
     @property
     def n_leads(self):
         return len(self.ecg_leads)
+
+    def get_lead(self, lead_name: LeadName) -> Optional[ECGLead]:
+        leads = [lead for lead in self.ecg_leads if lead.label == lead_name]
+        if len(leads) > 0:
+            return leads[0]
+        else:
+            return None
 
     @classmethod
     def from_dicom_file(cls, path: str):

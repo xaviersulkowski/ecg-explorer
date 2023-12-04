@@ -8,14 +8,14 @@ import numpy as np
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 
 from explorer.ECGExplorer import ECGExplorer
-from models.annotation import QRSComplex
-from models.ecg import ECGContainer, ECGLead
+from models.ecg import ECGContainer, ECGLead, LeadName
 from tkinter import filedialog as fd
 from tkinter.messagebox import showinfo, showwarning
 from matplotlib.ticker import AutoLocator
 from matplotlib.widgets import SpanSelector
 from matplotlib.backend_bases import MouseEvent, KeyEvent
 
+from models.span import Span
 
 APP_TITTLE = "ECG explorer"
 
@@ -28,10 +28,10 @@ class MainApplication(tk.Frame):
         # ====== app variables ======
         self.container: Optional[ECGContainer] = None
         self.explorer: Optional[ECGExplorer] = None
-        self.leads_mapping: dict[str, int] = {}
+        self.leads_mapping: dict[LeadName, int] = {}
         self.selected_lead_name = tk.StringVar()
         self.selected_lead: Optional[ECGLead] = None
-        self.spans = []
+        self.spans_per_lead: dict[LeadName, list[Span]] = {}
 
         self.show_processed_signal = tk.BooleanVar()
         self.show_processed_signal.set(False)
@@ -46,7 +46,7 @@ class MainApplication(tk.Frame):
             self,
             self.selected_lead_name,
             *list(self.leads_mapping.keys()),
-            command=self.on_lead_change,
+            command=self._on_lead_change,
         )
 
         self.top_frame.pack(anchor=tk.NW)
@@ -54,9 +54,9 @@ class MainApplication(tk.Frame):
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, side=tk.TOP, expand=True)
         self.bottom_frame.pack(anchor=tk.SE)
 
-        span = SpanSelector(
+        span_selector = SpanSelector(
             self.ax,
-            self.select_span,
+            self._select_span,
             "horizontal",
             useblit=True,
             props=dict(alpha=0.5, facecolor="red"),
@@ -65,18 +65,17 @@ class MainApplication(tk.Frame):
 
         self.selected_span_x_coordinates = None
 
-        self.canvas.mpl_connect("key_press_event", self.handle_key_press_event)
-        self.canvas.mpl_connect("pick_event", span)
-        self.canvas.mpl_connect("button_press_event", self.highlight_span)
+        self.canvas.mpl_connect("key_press_event", self._handle_key_press_event)
+        self.canvas.mpl_connect("pick_event", span_selector)
+        self.canvas.mpl_connect("button_press_event", self._highlight_span)
 
-    def select_span(self, onset, offset):
-        def overlaps(on1, off1, on2, off2):
-            if off1 < on2:
-                return False
-            if off2 < on1:
-                return False
-            return True
+    @staticmethod
+    def _do_spans_overlap(on1, off1, on2, off2):
+        if off1 < on2 or off2 < on1:
+            return False
+        return True
 
+    def _select_span(self, onset, offset):
         onset, offset = min(onset, offset), max(onset, offset)
 
         onset = int(onset / 1000 * self.selected_lead.fs)
@@ -88,8 +87,10 @@ class MainApplication(tk.Frame):
 
         # find overlapping QRS with selected span
         overlapping = [
-            True if overlaps(onset, offset, x.onset, x.offset) is True else False
-            for x in self.selected_lead.ann.qrs_complex_positions
+            True
+            if self._do_spans_overlap(onset, offset, x.onset, x.offset) is True
+            else False
+            for x in self.spans_per_lead[self.selected_lead.label]
         ]
 
         if len([i for i in overlapping if i is True]) > 1:
@@ -99,29 +100,28 @@ class MainApplication(tk.Frame):
             )
             return
 
-        if not any(overlapping):
-            # just add selection
-            self.selected_lead.ann.qrs_complex_positions.append(
-                QRSComplex(onset, offset)
-            )
-        else:
-            # update existing QRS complex
-            self.selected_lead.ann.qrs_complex_positions[
+        span = Span(onset, offset, self.ax)
+
+        if any(overlapping):
+            # if span overlaps then we need to remove the span and associated Polygon
+            self.spans_per_lead[self.selected_lead.label].pop(
                 overlapping.index(True)
-            ] = QRSComplex(onset, offset)
+            ).remove()
 
-        self.draw_annotations()
+        self.spans_per_lead[self.selected_lead.label].append(span)
+        self.canvas.draw()
 
-    def on_lead_change(self, lead_name: tk.StringVar | str):
+    def _on_lead_change(self, lead_name: tk.StringVar | str):
         if isinstance(lead_name, tk.StringVar):
             lead_name = lead_name.get()
 
+        self._clear_annotations()
         self.selected_lead = self._get_lead(lead_name)
         self.selected_span_x_coordinates = None
-        self.init_plot()
-        self.draw_annotations()
+        self._init_plot()
+        self._draw_annotations()
 
-    def _init_canvas(self):
+    def _init_canvas(self) -> (tk.Canvas, plt.Axes, plt.Line2D):
         fig, ax = plt.subplots()
         (line,) = ax.plot([], [])
         canvas = FigureCanvasTkAgg(fig, self)
@@ -145,19 +145,53 @@ class MainApplication(tk.Frame):
         self.selected_lead_name.set(list(self.leads_mapping.keys())[0])
         self.selected_lead = self._get_lead(self.selected_lead_name.get())
 
+        self.spans_per_lead = {x.label: [] for x in self.container.ecg_leads}
+
         self.top_frame.r1.configure(state=tk.NORMAL)
         self.top_frame.process_ecg_button.configure(state=tk.NORMAL)
         self.bottom_frame.generate_report_button.configure(state=tk.NORMAL)
 
-        self.init_plot()
+        self._init_plot()
 
     def process_signal(self):
         self.explorer.process()
         showinfo(title=APP_TITTLE, message="Processing done!")
         self.top_frame.r2.configure(state=tk.NORMAL)
-        self.draw_annotations()
+
+        for lead in self.container.ecg_leads:
+            self._create_spans_from_qrs_annotations(lead)
+
+        self.canvas.draw()
+
+    def _create_spans_from_qrs_annotations(self, lead: ECGLead):
+        """
+        In case we process signal after we made some manual selections, we want to merge these two types of selections.
+        Manual selections take precedence over these programmatically detected.
+        """
+        if lead.ann.qrs_complex_positions:
+            for c in lead.ann.qrs_complex_positions:
+                overlapping = [
+                    True
+                    if self._do_spans_overlap(c.onset, c.offset, x.onset, x.offset)
+                    is True
+                    else False
+                    for x in self.spans_per_lead[lead.label]
+                ]
+
+                if not any(overlapping):
+                    self.spans_per_lead[lead.label].append(
+                        Span(
+                            c.onset,
+                            c.offset,
+                            self.ax,
+                            visibility=lead.label == self.selected_lead.label,
+                        )
+                    )
 
     def generate_report(self):
+        for lead, spans in self.spans_per_lead.items():
+            self.explorer.update_annotations_from_spans(lead, spans)
+
         df = self.explorer.generate_report()
         filename = fd.asksaveasfile(
             mode="w", initialfile=f"untitled.csv", defaultextension=".csv"
@@ -172,7 +206,7 @@ class MainApplication(tk.Frame):
             title=APP_TITTLE, message=f"Report generated and saved to {filename.name}"
         )
 
-    def init_plot(self):
+    def _init_plot(self):
         lead = self.selected_lead
 
         waveform = (
@@ -209,63 +243,41 @@ class MainApplication(tk.Frame):
         self.line.set_data(range(len(waveform)), waveform)
         self.canvas.draw()
 
-    def draw_annotations(self):
-        if not self.selected_lead.ann.is_empty:
-            self.clear_annotations()
+    def _draw_annotations(self):
+        for span in self.spans_per_lead[self.selected_lead.label]:
+            span.set_visible(True)
+        self.canvas.draw()
 
-            onsets = [i.onset for i in self.selected_lead.ann.qrs_complex_positions]
-            offsets = [i.offset for i in self.selected_lead.ann.qrs_complex_positions]
+    def _clear_annotations(self):
+        for span in self.spans_per_lead[self.selected_lead.label]:
+            span.set_visible(False)
+        self.canvas.draw()
 
-            for on, off in zip(onsets, offsets):
-                span_selected = False
-                if self.selected_span_x_coordinates is not None:
-                    span_selected = (
-                        True
-                        if on
-                        < (
-                            self.selected_span_x_coordinates
-                            / 1000
-                            * self.selected_lead.fs
-                        )
-                        < off
-                        else False
-                    )
+    def _highlight_span(self, event: MouseEvent):
+        if event.dblclick:
+            self.selected_span_x_coordinates = event.xdata
 
-                self.spans.append(
-                    self.ax.axvspan(
-                        on,
-                        off,
-                        facecolor=(0, 1, 0, 0.5) if span_selected else (1, 0, 0, 0.5),
-                        lw=2,
-                    )
-                )
+            for span in self.spans_per_lead[self.selected_lead.label]:
+                if span.onset <= self.selected_span_x_coordinates <= span.offset:
+                    span.highlight()
+                    break
 
             self.canvas.draw()
 
-    def clear_annotations(self):
-        for span in self.spans:
-            span.remove()
-        self.spans.clear()
-
-    def highlight_span(self, event: MouseEvent):
-        if event.dblclick:
-            self.selected_span_x_coordinates = event.xdata
-            self.draw_annotations()
-
-    def handle_key_press_event(self, event: KeyEvent):
+    def _handle_key_press_event(self, event: KeyEvent):
         if event.key == "ctrl+d" and self.selected_span_x_coordinates is not None:
             self._delete_selected_span()
 
     def _delete_selected_span(self):
         i = None
-        for cnt, pos in enumerate(self.selected_lead.ann.qrs_complex_positions):
+        for cnt, pos in enumerate(self.spans_per_lead[self.selected_lead.label]):
             if pos.onset < self.selected_span_x_coordinates < pos.offset:
                 i = cnt
                 break
 
-        self.selected_lead.ann.qrs_complex_positions.pop(i)
+        self.spans_per_lead[self.selected_lead.label].pop(i).remove()
         self.selected_span_x_coordinates = None
-        self.draw_annotations()
+        self.canvas.draw()
 
     def exit_main(self):
         self.parent.destroy()
