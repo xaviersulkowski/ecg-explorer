@@ -81,10 +81,6 @@ class MainApplication(tk.Frame):
         onset = int(onset / 1000 * self.selected_lead.fs)
         offset = int(offset / 1000 * self.selected_lead.fs)
 
-        if offset - onset < 50:
-            # do nothing if selection is too short
-            return
-
         # find overlapping QRS with selected span
         overlapping = [
             True
