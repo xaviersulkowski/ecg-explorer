@@ -5,7 +5,6 @@ from detectors.qrs_detectors import PanTompkinsDetector
 from filters.ecg_signal_filter import BandPassEcgSignalFilter
 from models.annotation import QRSComplex
 from models.ecg import ECGContainer, LeadName
-from models.span import Span
 
 
 class ECGExplorer:
@@ -33,12 +32,10 @@ class ECGExplorer:
         # TODO: check if processed
         return self._container
 
-    def update_annotations_from_spans(self, lead_name: LeadName, spans: list[Span]):
+    def overwrite_annotations(self, lead_name: LeadName, qrs: list[QRSComplex]):
         lead = self._container.get_lead(lead_name)
         if lead:
-            lead.ann.qrs_complex_positions = [
-                QRSComplex(span.onset, span.offset) for span in spans
-            ]
+            lead.ann.qrs_complex_positions = qrs
 
     def generate_report(self) -> pd.DataFrame:
         def _padded(data: list, size: int) -> list:
@@ -64,3 +61,9 @@ class ECGExplorer:
             )
 
         return report
+
+    def save_annotations(self, filename):
+        self._container.save_annotations(filename)
+
+    def load_annotations(self, filename):
+        self._container.load_annotations(filename)

@@ -1,4 +1,5 @@
 import logging
+import pickle
 
 import numpy as np
 import pydicom as dicom
@@ -83,3 +84,26 @@ class ECGContainer:
             )
 
         return cls(leads, raw)
+
+    def save_annotations(self, filename):
+        annotations = {lead.label: lead.ann for lead in self.ecg_leads}
+
+        with open(filename, "wb") as file:
+            pickle.dump(annotations, file, protocol=pickle.HIGHEST_PROTOCOL)
+
+    def load_annotations(self, filename):
+        with open(filename, "rb") as file:
+            ann = pickle.load(file)
+
+            if not isinstance(ann, dict):
+                raise RuntimeError(
+                    "File you're trying to load is not an annotation file or is malformed"
+                )
+
+            for k, v in ann.items():
+                if not isinstance(k, str) and not isinstance(v, Annotation):
+                    raise RuntimeError(
+                        "File you're trying to load is not an annotation file or is malformed"
+                    )
+
+                self.get_lead(k).ann = v

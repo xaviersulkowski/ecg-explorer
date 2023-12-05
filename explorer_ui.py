@@ -1,20 +1,20 @@
+import os
 import tkinter as tk
-from tkinter import ttk
-from typing import Optional
-
 import matplotlib.pyplot as plt
 import numpy as np
 
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
-
-from explorer.ECGExplorer import ECGExplorer
-from models.ecg import ECGContainer, ECGLead, LeadName
-from tkinter import filedialog as fd
-from tkinter.messagebox import showinfo, showwarning
 from matplotlib.ticker import AutoLocator
 from matplotlib.widgets import SpanSelector
 from matplotlib.backend_bases import MouseEvent, KeyEvent
+from tkinter import ttk
+from tkinter import filedialog as fd
+from tkinter.messagebox import showinfo, showwarning
+from typing import Optional
 
+from explorer.ECGExplorer import ECGExplorer
+from models.annotation import QRSComplex
+from models.ecg import ECGContainer, ECGLead, LeadName
 from models.span import Span
 
 APP_TITTLE = "ECG explorer"
@@ -35,6 +35,9 @@ class MainApplication(tk.Frame):
 
         self.show_processed_signal = tk.BooleanVar()
         self.show_processed_signal.set(False)
+
+        self.file_path: Optional[str] = None
+        self.file_name: Optional[str] = None
 
         # ====== frames & widgets ======
 
@@ -132,6 +135,11 @@ class MainApplication(tk.Frame):
         self.explorer = ECGExplorer.load_from_file(filename)
         self.container = self.explorer.container
 
+        head, tail = os.path.split(filename)
+
+        self.file_path = head
+        self.file_name = tail.split(".")[0]
+
         self.leads_mapping = {
             x.label: cnt for cnt, x in enumerate(self.container.ecg_leads)
         }
@@ -141,11 +149,14 @@ class MainApplication(tk.Frame):
         self.selected_lead_name.set(list(self.leads_mapping.keys())[0])
         self.selected_lead = self._get_lead(self.selected_lead_name.get())
 
+        self._clear_annotations()
         self.spans_per_lead = {x.label: [] for x in self.container.ecg_leads}
 
         self.top_frame.r1.configure(state=tk.NORMAL)
         self.top_frame.process_ecg_button.configure(state=tk.NORMAL)
         self.bottom_frame.generate_report_button.configure(state=tk.NORMAL)
+        self.bottom_frame.save_annotations_button.configure(state=tk.NORMAL)
+        self.top_frame.load_ann_button.configure(state=tk.NORMAL)
 
         self._init_plot()
 
@@ -155,11 +166,11 @@ class MainApplication(tk.Frame):
         self.top_frame.r2.configure(state=tk.NORMAL)
 
         for lead in self.container.ecg_leads:
-            self._create_spans_from_qrs_annotations(lead)
+            self.create_spans_from_qrs_annotations(lead)
 
         self.canvas.draw()
 
-    def _create_spans_from_qrs_annotations(self, lead: ECGLead):
+    def create_spans_from_qrs_annotations(self, lead: ECGLead):
         """
         In case we process signal after we made some manual selections, we want to merge these two types of selections.
         Manual selections take precedence over these programmatically detected.
@@ -184,13 +195,17 @@ class MainApplication(tk.Frame):
                         )
                     )
 
-    def generate_report(self):
+    def update_annotations_from_spans(self):
         for lead, spans in self.spans_per_lead.items():
-            self.explorer.update_annotations_from_spans(lead, spans)
+            qrs = [QRSComplex(span.onset, span.offset) for span in spans]
+            self.explorer.overwrite_annotations(lead, qrs)
+
+    def generate_report(self):
+        self.update_annotations_from_spans()
 
         df = self.explorer.generate_report()
         filename = fd.asksaveasfile(
-            mode="w", initialfile=f"untitled.csv", defaultextension=".csv"
+            mode="w", initialfile=f"{self.file_name}.csv", defaultextension=".csv"
         )
 
         if filename is None:
@@ -245,6 +260,9 @@ class MainApplication(tk.Frame):
         self.canvas.draw()
 
     def _clear_annotations(self):
+        if not len(self.spans_per_lead) > 0:
+            return
+
         for span in self.spans_per_lead[self.selected_lead.label]:
             span.set_visible(False)
         self.canvas.draw()
@@ -299,6 +317,13 @@ class TopFrame(tk.Frame):
             state=tk.DISABLED,
         )
 
+        self.load_ann_button = tk.Button(
+            self,
+            text="Load annotations",
+            command=self._load_annotations,
+            state=tk.DISABLED,
+        )
+
         self.r1 = tk.Radiobutton(
             self.radio_button_frame,
             text="Raw signal",
@@ -320,6 +345,7 @@ class TopFrame(tk.Frame):
         self.r2.pack(anchor=tk.NW)
 
         self.open_button.grid(row=0, column=0, padx=20, pady=20)
+        self.load_ann_button.grid(row=1, column=0, padx=20, pady=20)
         self.process_ecg_button.grid(row=0, column=1, padx=10, pady=20)
         self.radio_button_frame.grid(row=0, column=2, padx=10, pady=20)
 
@@ -341,6 +367,31 @@ class TopFrame(tk.Frame):
 
         self.parent.load_signal(filename)
 
+    def _load_annotations(self):
+        filetypes = (("annotation files", "*.annx"),)
+        filename = fd.askopenfilename(title="Open a file", filetypes=filetypes)
+
+        if filename is None or filename == "" or filename == ():
+            showinfo(title=APP_TITTLE, message="File not selected")
+            return
+
+        should_continue = True
+        if any(len(span) > 0 for span in self.parent.spans_per_lead.values()):
+            should_continue = tk.messagebox.askyesno(
+                title=APP_TITTLE,
+                message="Loading annotations from the file will overwrite existing annotations. Are you sure?",
+            )
+
+        if not should_continue:
+            return
+
+        self.parent.explorer.load_annotations(filename)
+
+        for lead in self.parent.container.ecg_leads:
+            self.parent.create_spans_from_qrs_annotations(lead)
+
+        self.parent.canvas.draw()
+
 
 class BottomFrame(tk.Frame):
     def __init__(self, parent: MainApplication, *args, **kwargs):
@@ -352,6 +403,7 @@ class BottomFrame(tk.Frame):
             self,
             text="Save annotations",
             state=tk.DISABLED,
+            command=self._on_save_annotations,
         )
 
         self.save_annotations_button.grid(row=0, column=0, padx=20, pady=20)
@@ -373,6 +425,21 @@ class BottomFrame(tk.Frame):
         )
 
         self.quit.grid(row=1, column=1, padx=20, pady=20, sticky=tk.E)
+
+    def _on_save_annotations(self):
+        filename = fd.asksaveasfile(
+            mode="w",
+            initialfile=f"{self.parent.file_name}.annx",
+            defaultextension=".csv",
+        )
+
+        if filename is None:
+            return
+
+        self.parent.update_annotations_from_spans()
+        self.parent.explorer.save_annotations(filename.name)
+
+        showinfo(title=APP_TITTLE, message=f"Annotations saved to {filename.name}")
 
 
 if __name__ == "__main__":
