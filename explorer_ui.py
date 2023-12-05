@@ -1,10 +1,11 @@
 import os
+import math
 import tkinter as tk
 import matplotlib.pyplot as plt
 import numpy as np
 
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
-from matplotlib.ticker import AutoLocator
+from matplotlib.ticker import AutoMinorLocator, MultipleLocator
 from matplotlib.widgets import SpanSelector
 from matplotlib.backend_bases import MouseEvent, KeyEvent
 from tkinter import ttk
@@ -18,6 +19,7 @@ from models.ecg import ECGContainer, ECGLead, LeadName
 from models.span import Span
 
 APP_TITTLE = "ECG explorer"
+X_ECG_GRID_IN_MS = 200
 
 
 class MainApplication(tk.Frame):
@@ -125,7 +127,7 @@ class MainApplication(tk.Frame):
         (line,) = ax.plot([], [])
         canvas = FigureCanvasTkAgg(fig, self)
         NavigationToolbar2Tk(canvas)
-        ax.grid()
+        # ax.grid()
         return canvas, ax, line
 
     def _get_lead(self, lead_name: str):
@@ -223,19 +225,37 @@ class MainApplication(tk.Frame):
         waveform = (
             lead.waveform if self.show_processed_signal.get() else lead.raw_waveform
         )
-        x = np.arange(0, len(waveform), int(len(waveform) / 100))
-        x_ticks = x / lead.fs * 1000
+
+        # scale to milli-volts
+        if lead.units == 'microvolt':
+            waveform = waveform / 1000
+        else:
+            RuntimeError("Unit not known")
 
         self.line.set_data(range(len(waveform)), waveform)
 
-        self.ax.set_xlim(-100, len(waveform) + 100)
-        self.ax.set_ylim(min(waveform) - 100, max(waveform) + 100)
+        x = np.arange(0, len(waveform), X_ECG_GRID_IN_MS * lead.fs / 1000)
+        x_ticks = x / lead.fs
+
+        self.ax.set_xlim(0, len(waveform))
         self.ax.set_xticks(x)
         self.ax.set_xticklabels(x_ticks)
+
+        y = np.arange(math.floor(min(waveform) - 0.2), math.ceil(max(waveform) + 0.2), 0.5)
+
+        self.ax.set_ylim(min(waveform), max(waveform))
+        self.ax.set_yticks(y)
+
+        self.ax.xaxis.set_minor_locator(AutoMinorLocator(5))
+
+        self.ax.yaxis.set_minor_locator(MultipleLocator(0.1))
+
+        self.ax.grid(which='major', linestyle='-', linewidth='0.5', color='red')
+        self.ax.grid(which='minor', linestyle='-', linewidth='0.5', color=(1, 0.7, 0.7))
+
         self.ax.set_title(f"Lead name: {lead.label}")
-        self.ax.set_ylabel(f"{lead.units}")
-        self.ax.set_xlabel(f"milliseconds")
-        self.ax.xaxis.set_major_locator(AutoLocator())
+        self.ax.set_ylabel(f"mV")
+        self.ax.set_xlabel(f"seconds")
 
         self.canvas.draw()
 
@@ -445,7 +465,7 @@ class BottomFrame(tk.Frame):
 if __name__ == "__main__":
     root = tk.Tk()
     MainApplication(root).pack(side="top", fill=tk.BOTH, expand=True)
-    root.attributes("-fullscreen", False)
+    root.attributes("-zoomed", True)
     root.title(APP_TITTLE)
 
     root.mainloop()
