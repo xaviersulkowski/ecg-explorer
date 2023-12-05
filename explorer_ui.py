@@ -207,7 +207,7 @@ class MainApplication(tk.Frame):
 
         df = self.explorer.generate_report()
         filename = fd.asksaveasfile(
-            mode="w", initialfile=f"{self.file_name}.csv", defaultextension=".csv"
+            mode="w", initialfile=f"{self.file_name}", defaultextension=".csv"
         )
 
         if filename is None:
@@ -367,7 +367,7 @@ class TopFrame(tk.Frame):
         self.open_button.grid(row=0, column=0, padx=20, pady=20)
         self.load_ann_button.grid(row=1, column=0, padx=20, pady=20)
         self.process_ecg_button.grid(row=0, column=1, padx=10, pady=20)
-        self.radio_button_frame.grid(row=0, column=2, padx=10, pady=20)
+        # self.radio_button_frame.grid(row=0, column=2, padx=10, pady=20)
 
     def _on_radio_change(self):
         self.parent.update_waveform()
@@ -449,8 +449,8 @@ class BottomFrame(tk.Frame):
     def _on_save_annotations(self):
         filename = fd.asksaveasfile(
             mode="w",
-            initialfile=f"{self.parent.file_name}.annx",
-            defaultextension=".csv",
+            initialfile=f"{self.parent.file_name}",
+            defaultextension=".annx",
         )
 
         if filename is None:
@@ -465,7 +465,7 @@ class BottomFrame(tk.Frame):
 if __name__ == "__main__":
     root = tk.Tk()
     MainApplication(root).pack(side="top", fill=tk.BOTH, expand=True)
-    root.attributes("-zoomed", True)
+    root.state("zoomed")
     root.title(APP_TITTLE)
 
     root.mainloop()
