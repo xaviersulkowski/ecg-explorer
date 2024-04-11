@@ -4,8 +4,9 @@ import tkinter as tk
 import matplotlib.pyplot as plt
 import numpy as np
 
+import matplotlib
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
-from matplotlib.ticker import AutoMinorLocator, MultipleLocator
+from matplotlib.ticker import AutoMinorLocator, MultipleLocator, AutoLocator
 from matplotlib.widgets import SpanSelector
 from matplotlib.backend_bases import MouseEvent, KeyEvent
 from tkinter import ttk
@@ -16,9 +17,10 @@ from typing import Optional
 from explorer.ECGExplorer import ECGExplorer
 from models.annotation import QRSComplex
 from models.ecg import ECGContainer, ECGLead, LeadName
-from models.span import Span
+from models.ui_models import Span, AxProperties
 
 APP_TITTLE = "ECG explorer"
+matplotlib.use('Agg')
 
 
 class MainApplication(tk.Frame):
@@ -46,76 +48,33 @@ class MainApplication(tk.Frame):
         # ====== frames & widgets ======
 
         self.top_frame = TopFrame(self)
-        self.bottom_frame = BottomFrame(self)
+        self.leads_menu_frame = LeadsMenuFrame(self)
 
         ecg_plot_pack_config = {"fill": tk.BOTH, "side": tk.TOP, "expand": True}
         self.ecg_plot = ECGPlotHandler.empty(self, ecg_plot_pack_config)
 
-        self.leads_frame = LeadsFrame(self)
+        self.bottom_frame = BottomFrame(self)
 
         self.top_frame.pack(anchor=tk.NW)
-        self.leads_frame.pack(anchor=tk.NE, padx=20, pady=20)
+        self.leads_menu_frame.pack(anchor=tk.NE, padx=20, pady=20)
         self.ecg_plot.pack(**ecg_plot_pack_config)
-        self.bottom_frame.pack(anchor=tk.SE)
-
-        self.selected_span_x_coordinates = None
-
-        # self.canvas.mpl_connect("key_press_event", self._handle_key_press_event)
-        # self.canvas.mpl_connect("axes_enter_event", self._span_selector)
-        # self.canvas.mpl_connect("button_press_event", self._highlight_span)
-
-    @staticmethod
-    def _do_spans_overlap(on1, off1, on2, off2):
-        if off1 < on2 or off2 < on1:
-            return False
-        return True
-
-    def _select_span(self, onset, offset):
-        onset, offset = min(onset, offset), max(onset, offset)
-
-        onset = int(onset / 1000 * self.selected_lead.fs)
-        offset = int(offset / 1000 * self.selected_lead.fs)
-
-        # find overlapping QRS with selected span
-        overlapping = [
-            True
-            if self._do_spans_overlap(onset, offset, x.onset, x.offset) is True
-            else False
-            for x in self.spans_per_lead[self.selected_lead.label]
-        ]
-
-        if len([i for i in overlapping if i is True]) > 1:
-            tk.messagebox.showwarning(
-                title=APP_TITTLE,
-                message="Your selection cannot overlap with multiple QRS complexes",
-            )
-            return
-
-        span = Span(onset, offset, self.ax)
-
-        if any(overlapping):
-            # if span overlaps then we need to remove the span and associated Polygon
-            self.spans_per_lead[self.selected_lead.label].pop(
-                overlapping.index(True)
-            ).remove()
-
-        self.spans_per_lead[self.selected_lead.label].append(span)
-        self.canvas.draw()
+        self.bottom_frame.pack(anchor=tk.SE, fill=tk.BOTH)
 
     def _on_lead_change(self, *_):
 
-        selected_leads = [self._get_lead(lead_name) for lead_name in self.selected_leads_names.get()]
+        selected_leads = [self.get_lead(lead_name) for lead_name in self.selected_leads_names.get()]
         self.selected_leads = selected_leads
 
-        self.ecg_plot.plot_multiple_leads(self.selected_leads)
+        # 1. remove all existing span artists
+        self.ecg_plot.clear_annotations()
 
-        # self._clear_annotations()
-        # self.selected_lead = self._get_lead(lead_name)
-        # self.selected_span_x_coordinates = None
-        # self.plotter.plot_multiple_leads(self.selected_leads)
-        # self._draw_annotations()
+        # 2. re-draw waveforms and create new axes objects
+        self.ecg_plot.plot_waveforms_for_selected_leads(self.selected_leads)
 
-    def _get_lead(self, lead_name: str):
+        # 3. re-draw annotations if any
+        self.ecg_plot.draw_annotations_for_selected_leads()
+
+    def get_lead(self, lead_name: str) -> ECGLead:
         return self.container.ecg_leads[self.leads_mapping[lead_name]]
 
     def load_signal(self, filename: str):
@@ -123,7 +82,7 @@ class MainApplication(tk.Frame):
         def enable_options_on_signal_load():
             self.top_frame.activate_widgets()
             self.bottom_frame.activate_widgets()
-            self.leads_frame.activate_widgets()
+            self.leads_menu_frame.activate_widgets()
 
         self.explorer = ECGExplorer.load_from_file(filename)
         self.container = self.explorer.container
@@ -139,17 +98,17 @@ class MainApplication(tk.Frame):
             x.label: cnt for cnt, x in enumerate(self.container.ecg_leads)
         }
 
-        self.leads_frame.update_leads(self.leads_mapping)
+        self.leads_menu_frame.reload_leads_menu(self.leads_mapping)
 
         self.selected_leads = [
-            self._get_lead(list(self.leads_mapping.keys())[0]),
+            self.get_lead(list(self.leads_mapping.keys())[0]),
         ]
 
-        self._clear_annotations()
+        self.ecg_plot.clear_annotations()
         self.spans_per_lead = {x.label: [] for x in self.container.ecg_leads}
 
         self.ecg_plot.update_ecg_container(self.container)
-        self.ecg_plot.plot_multiple_leads(self.selected_leads)
+        self.ecg_plot.plot_waveforms_for_selected_leads(self.selected_leads)
 
     def process_signal(self):
         self.explorer.process()
@@ -159,7 +118,11 @@ class MainApplication(tk.Frame):
         for lead in self.container.ecg_leads:
             self.create_spans_from_qrs_annotations(lead)
 
-        self.canvas.draw()
+        self.parent.ecg_plot.canvas.draw()
+
+    def clear_all_spans(self):
+        for k in self.spans_per_lead.keys():
+            self.spans_per_lead[k].clear()
 
     def create_spans_from_qrs_annotations(self, lead: ECGLead):
         """
@@ -170,7 +133,7 @@ class MainApplication(tk.Frame):
             for c in lead.ann.qrs_complex_positions:
                 overlapping = [
                     True
-                    if self._do_spans_overlap(c.onset, c.offset, x.onset, x.offset)
+                    if _do_spans_overlap(c.onset, c.offset, x.onset, x.offset)
                     is True
                     else False
                     for x in self.spans_per_lead[lead.label]
@@ -181,8 +144,6 @@ class MainApplication(tk.Frame):
                         Span(
                             c.onset,
                             c.offset,
-                            self.ax,
-                            visibility=lead.label == self.selected_lead.label,
                         )
                     )
 
@@ -208,61 +169,20 @@ class MainApplication(tk.Frame):
             title=APP_TITTLE, message=f"Report generated and saved to {filename.name}"
         )
 
-    def update_waveform(self):
-        lead = self.selected_lead
-        waveform = (
-            lead.waveform
-            if self.show_processed_signal.get() is True
-            else lead.raw_waveform
-        )
-
-        if waveform is None:
-            showwarning(title=APP_TITTLE, message="Process the signal first!")
-            return
-
-        self.line.set_data(range(len(waveform)), waveform)
-        self.canvas.draw()
-
-    def _draw_annotations(self):
-        for span in self.spans_per_lead[self.selected_lead.label]:
-            span.set_visible(True)
-        self.canvas.draw()
-
-    def _clear_annotations(self):
-        if not len(self.spans_per_lead) > 0:
-            return
-
-        for lead in self.selected_leads:
-            for span in self.spans_per_lead[lead.label]:
-                span.set_visible(False)
-
-        self.canvas.draw()
-
-    def _highlight_span(self, event: MouseEvent):
-        if event.dblclick:
-            self.selected_span_x_coordinates = event.xdata
-
-            for span in self.spans_per_lead[self.selected_lead.label]:
-                if span.onset <= self.selected_span_x_coordinates <= span.offset:
-                    span.highlight()
-                    break
-
-            self.canvas.draw()
-
-    def _handle_key_press_event(self, event: KeyEvent):
-        if event.key == "ctrl+d" and self.selected_span_x_coordinates is not None:
-            self._delete_selected_span()
-
-    def _delete_selected_span(self):
-        i = None
-        for cnt, pos in enumerate(self.spans_per_lead[self.selected_lead.label]):
-            if pos.onset < self.selected_span_x_coordinates < pos.offset:
-                i = cnt
-                break
-
-        self.spans_per_lead[self.selected_lead.label].pop(i).remove()
-        self.selected_span_x_coordinates = None
-        self.canvas.draw()
+    # def update_waveform(self):
+    #     lead = self.selected_lead
+    #     waveform = (
+    #         lead.waveform
+    #         if self.show_processed_signal.get() is True
+    #         else lead.raw_waveform
+    #     )
+    #
+    #     if waveform is None:
+    #         showwarning(title=APP_TITTLE, message="Process the signal first!")
+    #         return
+    #
+    #     self.line.set_data(range(len(waveform)), waveform)
+    #     self.canvas.draw()
 
     def exit_main(self):
         self.parent.destroy()
@@ -357,11 +277,13 @@ class TopFrame(tk.Frame):
             return
 
         self.parent.explorer.load_annotations(filename)
+        self.parent.ecg_plot.clear_annotations()
+        self.parent.clear_all_spans()
 
         for lead in self.parent.container.ecg_leads:
             self.parent.create_spans_from_qrs_annotations(lead)
 
-        self.parent.canvas.draw()
+        self.parent.ecg_plot.draw_annotations_for_selected_leads()
 
     def activate_widgets(self):
         self.r1.configure(state=tk.NORMAL)
@@ -374,6 +296,9 @@ class BottomFrame(tk.Frame):
         tk.Frame.__init__(self, parent, *args, **kwargs)
 
         self.parent = parent
+
+        # dunno how, but works so I can move "Quit" button to the right side
+        self.columnconfigure(2, weight=1)
 
         self.save_annotations_button = tk.Button(
             self,
@@ -400,13 +325,13 @@ class BottomFrame(tk.Frame):
             bg="ivory4",
         )
 
-        self.quit.grid(row=1, column=1, padx=20, pady=20, sticky=tk.E)
+        self.quit.grid(row=0, column=2, padx=20, pady=20, sticky=tk.E)
 
     def _on_save_annotations(self):
         filename = fd.asksaveasfile(
             mode="w",
             initialfile=f"{self.parent.file_name}.annx",
-            defaultextension=".csv",
+            defaultextension=".annx",
         )
 
         if filename is None:
@@ -422,7 +347,7 @@ class BottomFrame(tk.Frame):
         self.save_annotations_button.configure(state=tk.NORMAL)
 
 
-class LeadsFrame(tk.Frame):
+class LeadsMenuFrame(tk.Frame):
     def __init__(self, parent: MainApplication, *args, **kwargs):
         tk.Frame.__init__(self, parent, *args, **kwargs)
         self.parent = parent
@@ -440,7 +365,8 @@ class LeadsFrame(tk.Frame):
         self.leads_listbox.pack(expand=True, fill=tk.BOTH, side=tk.LEFT)
         scrollbar.pack(side=tk.LEFT, expand=True, fill=tk.Y)
 
-    def update_leads(self, leads_mapping: dict[LeadName, int]):
+    def reload_leads_menu(self, leads_mapping: dict[LeadName, int]):
+        self.leads_listbox.delete(0, self.leads_listbox.size())
         for name, cnt in leads_mapping.items():
             self.leads_listbox.insert(cnt, name)
 
@@ -472,8 +398,10 @@ class ECGPlotHandler(tk.Frame):
 
     X_ECG_GRID_IN_MS = 200
 
-    def __init__(self, parent, pack_config, *args, **kwargs):
+    def __init__(self, parent: MainApplication, pack_config, *args, **kwargs):
         tk.Frame.__init__(self, parent, *args, **kwargs)
+
+        self.parent = parent
 
         # ====== widgets ======
         self.fig: plt.Figure = plt.figure()
@@ -485,63 +413,122 @@ class ECGPlotHandler(tk.Frame):
 
         # ====== app variables ======
         self.ecg_container: Optional[ECGContainer] = None
+        self.ax_properties: Optional[dict[LeadName, AxProperties]] = None
 
-        self.axes: Optional[list[plt.Axes]] = None
-        self.lines: Optional[list[plt.Line2D]] = None
-        self.span_selectors: Optional[list[SpanSelector]] = None
+        # mouse event that helps to handle actions when a span is selected
+        self.mouse_event: Optional[MouseEvent] = None
+
+        self.canvas.mpl_connect("button_press_event", self._select_and_highlight_span)
+        self.canvas.mpl_connect("key_press_event", self._handle_key_press_event)
 
     @classmethod
-    def empty(cls, parent: tk.Frame, pack_config: dict):
+    def empty(cls, parent: MainApplication, pack_config: dict):
         return ECGPlotHandler(parent, pack_config)
 
     def update_ecg_container(self, ecg_container: ECGContainer):
         self.ecg_container = ecg_container
 
-    def create_empty_plots(self, n_subplots: int):
+    def plot_waveforms_for_selected_leads(self, leads: list[ECGLead], show_processed_signal: bool = False):
+        self._create_subplots(leads)
+
+        for lead_name, ax_props in self.ax_properties.items():
+            lead = self.parent.get_lead(lead_name)
+            self._plot_waveform(lead, ax_props.ax, ax_props.line, show_processed_signal)
+
+        self.canvas.draw()
+        self.canvas.get_tk_widget().pack(fill=tk.BOTH, side=tk.TOP, expand=True)
+
+    def _on_select_with_axes(self, ax: plt.Axes):
+        def on_select(*positions: (float, float)):
+            lead_name = ax.get_title()
+            ax_props = self.ax_properties[lead_name]
+            self._set_selected_span(lead_name, ax_props.ax, *positions)
+
+        return on_select
+
+    def clear_annotations(self):
+        if not len(self.parent.spans_per_lead) > 0:
+            return
+
+        for spans in self.parent.spans_per_lead.values():
+            for span in spans:
+                span.remove_artist()
+
+        self.canvas.draw()
+
+    def _set_selected_span(self, lead_name: str, ax: plt.Axes, onset: float, offset: float):
+
+        if onset == offset:
+            return
+
+        onset, offset = min(onset, offset), max(onset, offset)
+        lead = self.parent.get_lead(lead_name)
+        fs = lead.fs
+
+        onset = int(onset / 1000 * fs)
+        offset = int(offset / 1000 * fs)
+
+        # find overlapping QRS with selected span
+        overlapping = [
+            True
+            if _do_spans_overlap(onset, offset, x.onset, x.offset) is True
+            else False
+            for x in self.parent.spans_per_lead[lead.label]
+        ]
+
+        if len([i for i in overlapping if i is True]) > 1:
+            tk.messagebox.showwarning(
+                title=APP_TITTLE,
+                message="Your selection cannot overlap with multiple QRS complexes",
+            )
+            return
+
+        if any(overlapping):
+            # if span overlaps then we need to remove the span and associated Polygon
+            self.parent.spans_per_lead[lead.label].pop(
+                overlapping.index(True)
+            ).remove_artist()
+
+        span = Span(onset, offset)
+        span.create_artist(ax)
+
+        self.parent.spans_per_lead[lead.label].append(span)
+        self.canvas.draw()
+
+    def _create_subplots(self, leads: list[ECGLead]):
         self.fig.clear()
 
+        n_subplots = len(leads)
         n_columns = 2 if n_subplots > 3 else 1
         n_rows = math.ceil(n_subplots / n_columns)
 
-        axes = []
-        lines = []
-        span_selectors = []
+        axes: dict[LeadName, AxProperties] = {}
 
-        for i in range(n_subplots):
+        for i, lead in enumerate(leads):
             ax = self.fig.add_subplot(n_rows, n_columns, i + 1)
 
             if i > 0:
-                ax.sharex(axes[0])
+                ax.sharex(list(axes.values())[0].ax)
 
             (line,) = ax.plot([], [])
 
             span_selector = SpanSelector(
                 ax,
-                lambda *x: print(x),
+                self._on_select_with_axes(ax),
                 direction="horizontal",
                 useblit=True,
                 props=dict(alpha=0.5, facecolor="red"),
                 interactive=True,
+                minspan=10,
             )
 
-            axes.append(ax)
-            lines.append(line)
-            span_selectors.append(span_selector)
+            # self.canvas.mpl_connect("key_press_event", span_selector)
 
-        self.axes = axes
-        self.lines = lines
-        self.span_selectors = span_selectors
+            axes[lead.label] = AxProperties(ax, line, span_selector)
 
-    def plot_multiple_leads(self, leads: list[ECGLead], show_processed_signal: bool = False):
-        self.create_empty_plots(len(leads))
+        self.ax_properties = axes
 
-        for lead, ax, line in zip(leads, self.axes, self.lines):
-            self.plot_waveform(lead, ax, line, show_processed_signal)
-
-        self.canvas.draw()
-        self.canvas.get_tk_widget().pack(fill=tk.BOTH, side=tk.TOP, expand=True)
-
-    def plot_waveform(self, lead: ECGLead, ax: plt.Axes, line: plt.Line2D, show_processed_signal: bool = False):
+    def _plot_waveform(self, lead: ECGLead, ax: plt.Axes, line: plt.Line2D, show_processed_signal: bool = False):
         waveform = (
             lead.waveform if show_processed_signal else lead.raw_waveform
         )
@@ -556,13 +543,16 @@ class ECGPlotHandler(tk.Frame):
 
         x = np.arange(0, len(waveform), self.X_ECG_GRID_IN_MS * lead.fs / 1000)
         x_ticks = x / lead.fs
-        ax.set_xlim(0, len(waveform))
         ax.set_xticks(x)
+        ax.set_xlim(0, len(waveform))
         ax.set_xticklabels(x_ticks)
 
-        y = np.arange(math.floor(min(waveform) - 0.2), math.ceil(max(waveform) + 0.2), 0.5)
-        ax.set_ylim(min(waveform), max(waveform))
+        y_min_round_half_down = round(min(waveform) * 2) / 2
+        y_max_round_half_up = round(max(waveform) * 2) / 2
+
+        y = np.arange(y_min_round_half_down - 1, y_max_round_half_up + 1, 0.5)
         ax.set_yticks(y)
+        ax.set_ylim(y_min_round_half_down - 0.1, y_max_round_half_up + 0.1)
 
         ax.xaxis.set_minor_locator(AutoMinorLocator(5))
         ax.yaxis.set_minor_locator(MultipleLocator(0.1))
@@ -575,11 +565,69 @@ class ECGPlotHandler(tk.Frame):
         ax.set_xlabel(f"seconds", fontsize=10)
         ax.label_outer()
 
+    def draw_annotations_for_selected_leads(self):
+        for lead in self.parent.selected_leads:
+            for span in self.parent.spans_per_lead[lead.label]:
+                ax_props = self.ax_properties[lead.label]
+                span.create_artist(ax_props.ax)
+
+        self.canvas.draw()
+
+    def _select_and_highlight_span(self, event: tk.Event):
+
+        if not isinstance(event, MouseEvent):
+            return
+
+        if event.dblclick:
+            self.mouse_event = event
+            selected_lead = self.mouse_event.inaxes.axes.get_title()
+
+            for span in self.parent.spans_per_lead[selected_lead]:
+                if span.onset <= self.mouse_event.xdata <= span.offset:
+                    span.highlight()
+                    break
+
+            self.canvas.draw()
+
+    def _handle_key_press_event(self, event: KeyEvent):
+        if self.mouse_event is None:
+            return
+
+        if event.key == "ctrl+d" and self.mouse_event.xdata is not None:
+            self._delete_selected_span()
+
+    def _delete_selected_span(self):
+
+        if sum([len(x) for x in self.parent.spans_per_lead.values()]) == 0:
+            return
+
+        i = None
+        selected_lead = self.mouse_event.inaxes.axes.get_title()
+
+        if len(self.parent.spans_per_lead[selected_lead]) == 0:
+            return
+
+        for cnt, pos in enumerate(self.parent.spans_per_lead[selected_lead]):
+            if pos.onset < self.mouse_event.xdata < pos.offset:
+                i = cnt
+                break
+
+        self.parent.spans_per_lead[selected_lead].pop(i).remove_artist()
+
+        self.mouse_event = None
+        self.canvas.draw()
+
+
+def _do_spans_overlap(on1, off1, on2, off2):
+    if off1 < on2 or off2 < on1:
+        return False
+    return True
+
 
 if __name__ == "__main__":
     root = tk.Tk()
     MainApplication(root).pack(side="top", fill=tk.BOTH, expand=True)
-    root.attributes("-zoomed", True)
+    root.attributes("-fullscreen", True)
     root.title(APP_TITTLE)
 
     root.mainloop()

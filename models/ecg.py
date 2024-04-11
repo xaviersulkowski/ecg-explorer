@@ -5,7 +5,7 @@ import numpy as np
 import pydicom as dicom
 
 from dataclasses import dataclass, field
-from typing import Any, Optional, Collection, TypeAlias
+from typing import Any, Optional, TypeAlias
 
 from models.annotation import Annotation
 
@@ -42,8 +42,8 @@ class ECGLead:
 
 
 class ECGContainer:
-    def __init__(self, ecg_leads: Collection[ECGLead], raw: Any):
-        self.ecg_leads: Collection[ECGLead] = ecg_leads
+    def __init__(self, ecg_leads: list[ECGLead], raw: Any):
+        self.ecg_leads: list[ECGLead] = ecg_leads
         self.raw: Any = raw
 
     @property
