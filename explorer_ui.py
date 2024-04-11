@@ -20,7 +20,7 @@ from models.ecg import ECGContainer, ECGLead, LeadName
 from models.ui_models import Span, AxProperties
 
 APP_TITTLE = "ECG explorer"
-matplotlib.use('Agg')
+matplotlib.use("Agg")
 
 
 class MainApplication(tk.Frame):
@@ -61,8 +61,9 @@ class MainApplication(tk.Frame):
         self.bottom_frame.pack(anchor=tk.SE, fill=tk.BOTH)
 
     def _on_lead_change(self, *_):
-
-        selected_leads = [self.get_lead(lead_name) for lead_name in self.selected_leads_names.get()]
+        selected_leads = [
+            self.get_lead(lead_name) for lead_name in self.selected_leads_names.get()
+        ]
         self.selected_leads = selected_leads
 
         # 1. remove all existing span artists
@@ -78,7 +79,6 @@ class MainApplication(tk.Frame):
         return self.container.ecg_leads[self.leads_mapping[lead_name]]
 
     def load_signal(self, filename: str):
-
         def enable_options_on_signal_load():
             self.top_frame.activate_widgets()
             self.bottom_frame.activate_widgets()
@@ -133,8 +133,7 @@ class MainApplication(tk.Frame):
             for c in lead.ann.qrs_complex_positions:
                 overlapping = [
                     True
-                    if _do_spans_overlap(c.onset, c.offset, x.onset, x.offset)
-                    is True
+                    if _do_spans_overlap(c.onset, c.offset, x.onset, x.offset) is True
                     else False
                     for x in self.spans_per_lead[lead.label]
                 ]
@@ -351,15 +350,22 @@ class LeadsMenuFrame(tk.Frame):
     def __init__(self, parent: MainApplication, *args, **kwargs):
         tk.Frame.__init__(self, parent, *args, **kwargs)
         self.parent = parent
-        self.leads_listbox = tk.Listbox(self, height=3, selectmode=tk.MULTIPLE, state=tk.DISABLED)
+        self.leads_listbox = tk.Listbox(
+            self, height=3, selectmode=tk.MULTIPLE, state=tk.DISABLED
+        )
         scrollbar = ttk.Scrollbar(
             self,
             orient=tk.VERTICAL,
             command=self.leads_listbox.yview,
         )
-        self.leads_listbox['yscrollcommand'] = scrollbar.set
+        self.leads_listbox["yscrollcommand"] = scrollbar.set
 
-        self.confirm_button = tk.Button(self, text="Confirm choices", command=self._on_confirm_button_click, state=tk.DISABLED)
+        self.confirm_button = tk.Button(
+            self,
+            text="Confirm choices",
+            command=self._on_confirm_button_click,
+            state=tk.DISABLED,
+        )
 
         self.confirm_button.pack(expand=True, side=tk.BOTTOM, fill=tk.X)
         self.leads_listbox.pack(expand=True, fill=tk.BOTH, side=tk.LEFT)
@@ -378,13 +384,10 @@ class LeadsMenuFrame(tk.Frame):
             tk.messagebox.showinfo(title=APP_TITTLE, message="No leads selected")
             return
 
-        selected_leads = '\n-'.join(currently_selected)
+        selected_leads = "\n-".join(currently_selected)
         msg = f"Currently selected leads:\n-{selected_leads}\n\nProceed?"
 
-        should_continue = tk.messagebox.askyesno(
-            title=APP_TITTLE,
-            message=msg
-        )
+        should_continue = tk.messagebox.askyesno(title=APP_TITTLE, message=msg)
 
         if should_continue:
             self.parent.selected_leads_names.set(currently_selected)
@@ -395,7 +398,6 @@ class LeadsMenuFrame(tk.Frame):
 
 
 class ECGPlotHandler(tk.Frame):
-
     X_ECG_GRID_IN_MS = 200
 
     def __init__(self, parent: MainApplication, pack_config, *args, **kwargs):
@@ -428,7 +430,9 @@ class ECGPlotHandler(tk.Frame):
     def update_ecg_container(self, ecg_container: ECGContainer):
         self.ecg_container = ecg_container
 
-    def plot_waveforms_for_selected_leads(self, leads: list[ECGLead], show_processed_signal: bool = False):
+    def plot_waveforms_for_selected_leads(
+        self, leads: list[ECGLead], show_processed_signal: bool = False
+    ):
         self._create_subplots(leads)
 
         for lead_name, ax_props in self.ax_properties.items():
@@ -456,8 +460,9 @@ class ECGPlotHandler(tk.Frame):
 
         self.canvas.draw()
 
-    def _set_selected_span(self, lead_name: str, ax: plt.Axes, onset: float, offset: float):
-
+    def _set_selected_span(
+        self, lead_name: str, ax: plt.Axes, onset: float, offset: float
+    ):
         if onset == offset:
             return
 
@@ -528,13 +533,17 @@ class ECGPlotHandler(tk.Frame):
 
         self.ax_properties = axes
 
-    def _plot_waveform(self, lead: ECGLead, ax: plt.Axes, line: plt.Line2D, show_processed_signal: bool = False):
-        waveform = (
-            lead.waveform if show_processed_signal else lead.raw_waveform
-        )
+    def _plot_waveform(
+        self,
+        lead: ECGLead,
+        ax: plt.Axes,
+        line: plt.Line2D,
+        show_processed_signal: bool = False,
+    ):
+        waveform = lead.waveform if show_processed_signal else lead.raw_waveform
 
         # scale to milli-volts
-        if lead.units == 'microvolt':
+        if lead.units == "microvolt":
             waveform = waveform / 1000
         else:
             RuntimeError("Unit not known")
@@ -557,8 +566,8 @@ class ECGPlotHandler(tk.Frame):
         ax.xaxis.set_minor_locator(AutoMinorLocator(5))
         ax.yaxis.set_minor_locator(MultipleLocator(0.1))
 
-        ax.grid(which='major', linestyle='-', linewidth='0.5', color='red')
-        ax.grid(which='minor', linestyle='-', linewidth='0.5', color=(1, 0.7, 0.7))
+        ax.grid(which="major", linestyle="-", linewidth="0.5", color="red")
+        ax.grid(which="minor", linestyle="-", linewidth="0.5", color=(1, 0.7, 0.7))
 
         ax.set_title(f"{lead.label}", x=0.01, y=0.9, transform=ax.transAxes, ha="left")
         ax.set_ylabel(f"mV", fontsize=10)
@@ -574,7 +583,6 @@ class ECGPlotHandler(tk.Frame):
         self.canvas.draw()
 
     def _select_and_highlight_span(self, event: tk.Event):
-
         if not isinstance(event, MouseEvent):
             return
 
@@ -597,7 +605,6 @@ class ECGPlotHandler(tk.Frame):
             self._delete_selected_span()
 
     def _delete_selected_span(self):
-
         if sum([len(x) for x in self.parent.spans_per_lead.values()]) == 0:
             return
 
