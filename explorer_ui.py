@@ -122,8 +122,10 @@ class MainApplication(tk.Frame):
         self.ecg_plot.draw_annotations_for_selected_leads()
 
     def clear_all_spans(self):
+        self.ecg_plot.clear_annotations()
         for k in self.spans_per_lead.keys():
             self.spans_per_lead[k].clear()
+        self.ecg_plot.draw_annotations_for_selected_leads()
 
     def create_spans_from_qrs_annotations(self, lead: ECGLead):
         """
@@ -195,15 +197,13 @@ class TopFrame(tk.Frame):
 
         self.parent = parent
 
-        self.radio_button_frame = tk.Frame(self)
-
         self.open_button = tk.Button(
             self, text="Select ECG file", command=self._select_file, bg="ivory4"
         )
 
         self.process_ecg_button = tk.Button(
             self,
-            text="Process ECG",
+            text="Detect QRS",
             command=self.parent.process_signal,
             state=tk.DISABLED,
         )
@@ -215,33 +215,17 @@ class TopFrame(tk.Frame):
             state=tk.DISABLED,
         )
 
-        self.r1 = tk.Radiobutton(
-            self.radio_button_frame,
-            text="Raw signal",
-            variable=self.parent.show_processed_signal,
-            value=False,
-            command=self._on_radio_change,
+        self.clear_ann_button = tk.Button(
+            self,
+            text="Clear all annotations",
+            command=self._clear_annotations,
             state=tk.DISABLED,
         )
-        self.r1.pack(anchor=tk.NW)
-
-        self.r2 = tk.Radiobutton(
-            self.radio_button_frame,
-            text="Processed signal",
-            variable=self.parent.show_processed_signal,
-            value=True,
-            command=self._on_radio_change,
-            state=tk.DISABLED,
-        )
-        self.r2.pack(anchor=tk.NW)
 
         self.open_button.grid(row=0, column=0, padx=20, pady=20)
         self.load_ann_button.grid(row=1, column=0, padx=20, pady=20)
         self.process_ecg_button.grid(row=0, column=1, padx=10, pady=20)
-        self.radio_button_frame.grid(row=0, column=2, padx=10, pady=20)
-
-    def _on_radio_change(self):
-        self.parent.update_waveform()
+        self.clear_ann_button.grid(row=1, column=1, padx=10, pady=20)
 
     def _select_file(self):
         filetypes = (("Dicom files", "*.dcm"),)
@@ -257,6 +241,18 @@ class TopFrame(tk.Frame):
         showinfo(title=APP_TITTLE, message="Successfully loaded file!")
 
         self.parent.load_signal(filename)
+
+    def _clear_annotations(self):
+        should_continue = tk.messagebox.askyesno(
+            title=APP_TITTLE,
+            message="Do you want to delete all existing annotations?",
+        )
+
+        if not should_continue:
+            return
+
+        self.parent.clear_all_spans()
+        self.parent.ecg_plot.draw_annotations_for_selected_leads()
 
     def _load_annotations(self):
         filetypes = (("annotation files", "*.annx"),)
@@ -277,7 +273,6 @@ class TopFrame(tk.Frame):
             return
 
         self.parent.explorer.load_annotations(filename)
-        self.parent.ecg_plot.clear_annotations()
         self.parent.clear_all_spans()
 
         for lead in self.parent.container.ecg_leads:
@@ -286,9 +281,9 @@ class TopFrame(tk.Frame):
         self.parent.ecg_plot.draw_annotations_for_selected_leads()
 
     def activate_widgets(self):
-        self.r1.configure(state=tk.NORMAL)
         self.process_ecg_button.configure(state=tk.NORMAL)
         self.load_ann_button.configure(state=tk.NORMAL)
+        self.clear_ann_button.configure(state=tk.NORMAL)
 
 
 class BottomFrame(tk.Frame):
@@ -361,6 +356,24 @@ class LeadsMenuFrame(tk.Frame):
         )
         self.leads_listbox["yscrollcommand"] = scrollbar.set
 
+        self.select_buttons_frame = tk.Frame(self)
+
+        self.select_all_button = tk.Button(
+            self.select_buttons_frame,
+            text="Select all",
+            command=self._select_all_leads,
+            state=tk.DISABLED,
+        )
+        self.select_all_button.pack(side=tk.LEFT, expand=True)
+
+        self.clear_all_button = tk.Button(
+            self.select_buttons_frame,
+            text="Clear all",
+            command=self._clear_all_leads,
+            state=tk.DISABLED,
+        )
+        self.clear_all_button.pack(side=tk.RIGHT, expand=True)
+
         self.confirm_button = tk.Button(
             self,
             text="Confirm choices",
@@ -369,8 +382,16 @@ class LeadsMenuFrame(tk.Frame):
         )
 
         self.confirm_button.pack(expand=True, side=tk.BOTTOM, fill=tk.X)
+        self.select_buttons_frame.pack(expand=True, side=tk.BOTTOM, fill=tk.X)
         self.leads_listbox.pack(expand=True, fill=tk.BOTH, side=tk.LEFT)
         scrollbar.pack(side=tk.LEFT, expand=True, fill=tk.Y)
+
+    def _clear_all_leads(self):
+        self.leads_listbox.selection_clear(0, self.leads_listbox.size())
+        self.leads_listbox.selection_set(0)
+
+    def _select_all_leads(self):
+        self.leads_listbox.selection_set(0, self.leads_listbox.size())
 
     def reload_leads_menu(self, leads_mapping: dict[LeadName, int]):
         self.leads_listbox.delete(0, self.leads_listbox.size())
@@ -396,6 +417,8 @@ class LeadsMenuFrame(tk.Frame):
     def activate_widgets(self):
         self.leads_listbox.configure(state=tk.NORMAL)
         self.confirm_button.configure(state=tk.NORMAL)
+        self.clear_all_button.configure(state=tk.NORMAL)
+        self.select_all_button.configure(state=tk.NORMAL)
 
 
 class ECGPlotHandler(tk.Frame):
