@@ -33,32 +33,12 @@ class ECGLead:
         ]
 
     def calculate_qrs_areas(self):
-
-        areas = []
-
-        for pos in (self.ann.qrs_complex_positions or []):
-            # 1. absolut value of a signal
-            waveform_abs = self.raw_waveform[pos.onset: pos.offset]
-
-            # 2. "estimate" an ecg baseline, which is a line between QRS onset and offset y = ax + b
-            x1, y1 = pos.onset, waveform_abs[0]
-            x2, y2 = pos.offset, waveform_abs[-1]
-
-            a = (y1-y2)/(x1-x2)
-            b = (x1*y2 - x2*y1)/(x1-x2)
-
-            # 3. adjust waveform, move qrs to the baseline
-            baseline = (np.arange(x1, x2) * a) + b
-            waveform_adj = waveform_abs - baseline
-
-            # 4. calculate area
-            areas.append(
-                np.round(
-                    np.trapz(waveform_adj), decimals=2
-                )
+        return [
+            np.round(
+                np.trapz(np.abs(self.raw_waveform[pos.onset: pos.offset])), decimals=2
             )
-
-        return areas
+            for pos in self.ann.qrs_complex_positions or []
+        ]
 
 
 class ECGContainer:
