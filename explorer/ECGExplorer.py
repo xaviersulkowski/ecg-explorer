@@ -56,7 +56,7 @@ class ECGExplorer:
             report[f"{column_root}_width_ms"] = pd.Series(
                 _padded(lead.calculate_qrs_lengths(), max_size)
             )
-            report[f"{column_root}_abs_area_mV^2"] = pd.Series(
+            report[f"{column_root}_area_uV.s"] = pd.Series(
                 _padded(lead.calculate_qrs_areas(), max_size)
             )
 

@@ -114,7 +114,6 @@ class MainApplication(tk.Frame):
     def process_signal(self):
         self.explorer.process()
         showinfo(title=APP_TITTLE, message="Processing done!")
-        self.top_frame.r2.configure(state=tk.NORMAL)
 
         for lead in self.container.ecg_leads:
             self.create_spans_from_qrs_annotations(lead)
