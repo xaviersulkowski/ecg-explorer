@@ -118,7 +118,7 @@ class MainApplication(tk.Frame):
         for lead in self.container.ecg_leads:
             self.create_spans_from_qrs_annotations(lead)
 
-        self.parent.ecg_plot.canvas.draw()
+        self.ecg_plot.draw_annotations_for_selected_leads()
 
     def clear_all_spans(self):
         for k in self.spans_per_lead.keys():
