@@ -12,6 +12,7 @@ class Span:
     offset: int
     # TODO: this is meh, b/c we re-create artist every time we create new Axes
     _span_artist: Optional[plt.Polygon] = field(init=False, default=None)
+    is_highlighted: Optional[bool] = field(init=False, default=False)
 
     def create_artist(self, ax: plt.Axes, visibility: bool = True):
         self._span_artist = ax.axvspan(
@@ -40,6 +41,7 @@ class Span:
             return
 
         self._span_artist.set_facecolor((0, 1, 0, 0.5))
+        self.is_highlighted = True
 
     def remove_highlight(self):
         if self._span_artist is None:
@@ -49,6 +51,7 @@ class Span:
             return
 
         self._span_artist.set_facecolor((1, 0, 0, 0.5))
+        self.is_highlighted = False
 
     def remove_artist(self):
         if self._span_artist is None:

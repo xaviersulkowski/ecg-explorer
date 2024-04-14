@@ -556,8 +556,8 @@ class ECGPlotHandler(tk.Frame):
         ax.set_xlim(0, len(waveform))
         ax.set_xticklabels(x_ticks)
 
-        y_min_round_half_down = round((min(waveform) - 0.5) * 2) / 2
-        y_max_round_half_up = round((max(waveform) + 0.5) * 2) / 2
+        y_min_round_half_down = round((min(waveform) - (0.5 if (abs(min(waveform)) * 2 % 1) < .5 else 0)) * 2) / 2
+        y_max_round_half_up = round((max(waveform) + (0.5 if (max(waveform) * 2 % 1) < .5 else 0)) * 2) / 2
 
         y = np.arange(y_min_round_half_down - 1, y_max_round_half_up + 1, 0.5)
         ax.set_yticks(y)
@@ -592,7 +592,11 @@ class ECGPlotHandler(tk.Frame):
 
             for span in self.parent.spans_per_lead[selected_lead]:
                 if span.onset <= self.mouse_event.xdata <= span.offset:
-                    span.highlight()
+                    if span.is_highlighted:
+                        span.remove_highlight()
+                        self.mouse_event = None
+                    else:
+                        span.highlight()
                     break
 
             self.canvas.draw()
