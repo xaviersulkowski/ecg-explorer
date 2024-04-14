@@ -6,12 +6,12 @@ import numpy as np
 
 import matplotlib
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
-from matplotlib.ticker import AutoMinorLocator, MultipleLocator, AutoLocator
+from matplotlib.ticker import AutoMinorLocator, MultipleLocator
 from matplotlib.widgets import SpanSelector
 from matplotlib.backend_bases import MouseEvent, KeyEvent
 from tkinter import ttk
 from tkinter import filedialog as fd
-from tkinter.messagebox import showinfo, showwarning
+from tkinter.messagebox import showinfo
 from typing import Optional
 
 from explorer.ECGExplorer import ECGExplorer
@@ -99,6 +99,7 @@ class MainApplication(tk.Frame):
         }
 
         self.leads_menu_frame.reload_leads_menu(self.leads_mapping)
+        self.leads_menu_frame.leads_listbox.selection_set(0)
 
         self.selected_leads = [
             self.get_lead(list(self.leads_mapping.keys())[0]),
@@ -407,7 +408,6 @@ class ECGPlotHandler(tk.Frame):
 
         # ====== widgets ======
         self.fig: plt.Figure = plt.figure()
-        self.fig.tight_layout()
 
         self.canvas = FigureCanvasTkAgg(self.fig, self)
         NavigationToolbar2Tk(self.canvas)
@@ -527,9 +527,10 @@ class ECGPlotHandler(tk.Frame):
                 minspan=10,
             )
 
-            # self.canvas.mpl_connect("key_press_event", span_selector)
-
             axes[lead.label] = AxProperties(ax, line, span_selector)
+
+        # need to set tight layout after each fig redrawing
+        self.fig.tight_layout()
 
         self.ax_properties = axes
 
@@ -555,6 +556,7 @@ class ECGPlotHandler(tk.Frame):
         ax.set_xticks(x)
         ax.set_xlim(0, len(waveform))
         ax.set_xticklabels(x_ticks)
+        ax.xaxis.set_tick_params(labelsize=9)
 
         y_min_round_half_down = round((min(waveform) - (0.5 if (abs(min(waveform)) * 2 % 1) < .5 else 0)) * 2) / 2
         y_max_round_half_up = round((max(waveform) + (0.5 if (max(waveform) * 2 % 1) < .5 else 0)) * 2) / 2
@@ -562,6 +564,7 @@ class ECGPlotHandler(tk.Frame):
         y = np.arange(y_min_round_half_down - 1, y_max_round_half_up + 1, 0.5)
         ax.set_yticks(y)
         ax.set_ylim(y_min_round_half_down - 0.1, y_max_round_half_up + 0.1)
+        ax.yaxis.set_tick_params(labelsize=9)
 
         ax.xaxis.set_minor_locator(AutoMinorLocator(5))
         ax.yaxis.set_minor_locator(MultipleLocator(0.1))
@@ -570,8 +573,8 @@ class ECGPlotHandler(tk.Frame):
         ax.grid(which="minor", linestyle="-", linewidth="0.5", color=(1, 0.7, 0.7))
 
         ax.set_title(f"{lead.label}", x=0.01, y=0.9, transform=ax.transAxes, ha="left")
-        ax.set_ylabel(f"mV", fontsize=8)
-        ax.set_xlabel(f"seconds", fontsize=8)
+        ax.set_ylabel(f"mV", fontsize=10)
+        ax.set_xlabel(f"seconds", fontsize=10)
         ax.label_outer()
 
     def draw_annotations_for_selected_leads(self):
@@ -638,7 +641,7 @@ def _do_spans_overlap(on1, off1, on2, off2):
 if __name__ == "__main__":
     root = tk.Tk()
     MainApplication(root).pack(side="top", fill=tk.BOTH, expand=True)
-    root.attributes("-fullscreen", True)
+    root.attributes("-alpha", True)
     root.title(APP_TITTLE)
 
     root.mainloop()
