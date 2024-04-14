@@ -556,8 +556,8 @@ class ECGPlotHandler(tk.Frame):
         ax.set_xlim(0, len(waveform))
         ax.set_xticklabels(x_ticks)
 
-        y_min_round_half_down = round(min(waveform) * 2) / 2
-        y_max_round_half_up = round(max(waveform) * 2) / 2
+        y_min_round_half_down = round((min(waveform) - 0.5) * 2) / 2
+        y_max_round_half_up = round((max(waveform) + 0.5) * 2) / 2
 
         y = np.arange(y_min_round_half_down - 1, y_max_round_half_up + 1, 0.5)
         ax.set_yticks(y)
@@ -570,8 +570,8 @@ class ECGPlotHandler(tk.Frame):
         ax.grid(which="minor", linestyle="-", linewidth="0.5", color=(1, 0.7, 0.7))
 
         ax.set_title(f"{lead.label}", x=0.01, y=0.9, transform=ax.transAxes, ha="left")
-        ax.set_ylabel(f"mV", fontsize=10)
-        ax.set_xlabel(f"seconds", fontsize=10)
+        ax.set_ylabel(f"mV", fontsize=8)
+        ax.set_xlabel(f"seconds", fontsize=8)
         ax.label_outer()
 
     def draw_annotations_for_selected_leads(self):
