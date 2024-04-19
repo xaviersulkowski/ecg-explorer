@@ -47,18 +47,22 @@ class MainApplication(tk.Frame):
 
         # ====== frames & widgets ======
 
-        self.top_frame = TopFrame(self)
-        self.leads_menu_frame = LeadsMenuFrame(self)
+        self.top_pane = tk.Frame(self.parent)
 
         ecg_plot_pack_config = {"fill": tk.BOTH, "side": tk.TOP, "expand": True}
         self.ecg_plot = ECGPlotHandler.empty(self, ecg_plot_pack_config)
 
-        self.bottom_frame = BottomFrame(self)
-
-        self.top_frame.pack(anchor=tk.NW)
-        self.leads_menu_frame.pack(anchor=tk.NE, padx=20, pady=20)
+        self.top_pane.pack(fill=tk.BOTH, side=tk.TOP)
         self.ecg_plot.pack(**ecg_plot_pack_config)
-        self.bottom_frame.pack(anchor=tk.SE, fill=tk.BOTH)
+
+        self.action_buttons_frame = ActionButtonsFrame(self.top_pane, self)
+        self.action_buttons_frame.pack(anchor=tk.NW, side=tk.LEFT, fill=tk.Y)
+
+        self.leads_menu_frame = LeadsMenuFrame(self.top_pane, self)
+        self.leads_menu_frame.pack(anchor=tk.E, side=tk.RIGHT, padx=10, pady=10)
+
+        self.bottom_frame = BottomFrame(self.parent, self)
+        self.bottom_frame.pack(side=tk.BOTTOM, fill=tk.BOTH)
 
     def _on_lead_change(self, *_):
         selected_leads = [
@@ -80,7 +84,7 @@ class MainApplication(tk.Frame):
 
     def load_signal(self, filename: str):
         def enable_options_on_signal_load():
-            self.top_frame.activate_widgets()
+            self.action_buttons_frame.activate_widgets()
             self.bottom_frame.activate_widgets()
             self.leads_menu_frame.activate_widgets()
 
@@ -170,31 +174,17 @@ class MainApplication(tk.Frame):
             title=APP_TITTLE, message=f"Report generated and saved to {filename.name}"
         )
 
-    # def update_waveform(self):
-    #     lead = self.selected_lead
-    #     waveform = (
-    #         lead.waveform
-    #         if self.show_processed_signal.get() is True
-    #         else lead.raw_waveform
-    #     )
-    #
-    #     if waveform is None:
-    #         showwarning(title=APP_TITTLE, message="Process the signal first!")
-    #         return
-    #
-    #     self.line.set_data(range(len(waveform)), waveform)
-    #     self.canvas.draw()
-
     def exit_main(self):
         self.parent.destroy()
         exit()
 
 
-class TopFrame(tk.Frame):
-    def __init__(self, parent: MainApplication, *args, **kwargs):
+class ActionButtonsFrame(tk.Frame):
+    def __init__(self, parent: tk.Frame, app: MainApplication, *args, **kwargs):
         tk.Frame.__init__(self, parent, *args, **kwargs)
 
         self.parent = parent
+        self.app = app
 
         self.open_button = tk.Button(
             self, text="Select ECG file", command=self._select_file, bg="ivory4"
@@ -203,7 +193,7 @@ class TopFrame(tk.Frame):
         self.process_ecg_button = tk.Button(
             self,
             text="Detect QRS",
-            command=self.parent.process_signal,
+            command=self.app.process_signal,
             state=tk.DISABLED,
         )
 
@@ -221,10 +211,10 @@ class TopFrame(tk.Frame):
             state=tk.DISABLED,
         )
 
-        self.open_button.grid(row=0, column=0, padx=20, pady=20)
-        self.load_ann_button.grid(row=1, column=0, padx=20, pady=20)
-        self.process_ecg_button.grid(row=0, column=1, padx=10, pady=20)
-        self.clear_ann_button.grid(row=1, column=1, padx=10, pady=20)
+        self.open_button.grid(row=0, column=0, padx=5, pady=5, sticky='nesw')
+        self.load_ann_button.grid(row=1, column=0, padx=5, pady=5, sticky='nesw')
+        self.process_ecg_button.grid(row=0, column=1, padx=5, pady=5, sticky='nesw')
+        self.clear_ann_button.grid(row=1, column=1, padx=5, pady=5, sticky='nesw')
 
     def _select_file(self):
         filetypes = (("Dicom files", "*.dcm"),)
@@ -239,7 +229,7 @@ class TopFrame(tk.Frame):
 
         showinfo(title=APP_TITTLE, message="Successfully loaded file!")
 
-        self.parent.load_signal(filename)
+        self.app.load_signal(filename)
 
     def _clear_annotations(self):
         should_continue = tk.messagebox.askyesno(
@@ -250,8 +240,8 @@ class TopFrame(tk.Frame):
         if not should_continue:
             return
 
-        self.parent.clear_all_spans()
-        self.parent.ecg_plot.draw_annotations_for_selected_leads()
+        self.app.clear_all_spans()
+        self.app.ecg_plot.draw_annotations_for_selected_leads()
 
     def _load_annotations(self):
         filetypes = (("annotation files", "*.annx"),)
@@ -262,7 +252,7 @@ class TopFrame(tk.Frame):
             return
 
         should_continue = True
-        if any(len(span) > 0 for span in self.parent.spans_per_lead.values()):
+        if any(len(span) > 0 for span in self.app.spans_per_lead.values()):
             should_continue = tk.messagebox.askyesno(
                 title=APP_TITTLE,
                 message="Loading annotations from the file will overwrite existing annotations. Are you sure?",
@@ -271,13 +261,13 @@ class TopFrame(tk.Frame):
         if not should_continue:
             return
 
-        self.parent.explorer.load_annotations(filename)
-        self.parent.clear_all_spans()
+        self.app.explorer.load_annotations(filename)
+        self.app.clear_all_spans()
 
-        for lead in self.parent.container.ecg_leads:
-            self.parent.create_spans_from_qrs_annotations(lead)
+        for lead in self.app.container.ecg_leads:
+            self.app.create_spans_from_qrs_annotations(lead)
 
-        self.parent.ecg_plot.draw_annotations_for_selected_leads()
+        self.app.ecg_plot.draw_annotations_for_selected_leads()
 
     def activate_widgets(self):
         self.process_ecg_button.configure(state=tk.NORMAL)
@@ -286,13 +276,11 @@ class TopFrame(tk.Frame):
 
 
 class BottomFrame(tk.Frame):
-    def __init__(self, parent: MainApplication, *args, **kwargs):
+    def __init__(self, parent: tk.Frame, app: MainApplication, *args, **kwargs):
         tk.Frame.__init__(self, parent, *args, **kwargs)
 
         self.parent = parent
-
-        # dunno how, but works so I can move "Quit" button to the right side
-        self.columnconfigure(2, weight=1)
+        self.app = app
 
         self.save_annotations_button = tk.Button(
             self,
@@ -301,38 +289,36 @@ class BottomFrame(tk.Frame):
             command=self._on_save_annotations,
         )
 
-        self.save_annotations_button.grid(row=0, column=0, padx=20, pady=20)
-
         self.generate_report_button = tk.Button(
             self,
             text="Generate report",
             state=tk.DISABLED,
-            command=self.parent.generate_report,
+            command=self.app.generate_report,
         )
-
-        self.generate_report_button.grid(row=0, column=1, padx=20, pady=20)
 
         self.quit = tk.Button(
             self,
             text="Quit",
-            command=self.parent.exit_main,
+            command=self.app.exit_main,
             bg="ivory4",
         )
 
-        self.quit.grid(row=0, column=2, padx=20, pady=20, sticky=tk.E)
+        self.save_annotations_button.pack(side=tk.LEFT, padx=10, pady=10)
+        self.generate_report_button.pack(side=tk.LEFT, padx=5, pady=10)
+        self.quit.pack(side=tk.RIGHT, padx=10, pady=10)
 
     def _on_save_annotations(self):
         filename = fd.asksaveasfile(
             mode="w",
-            initialfile=f"{self.parent.file_name}.annx",
+            initialfile=f"{self.app.file_name}.annx",
             defaultextension=".annx",
         )
 
         if filename is None:
             return
 
-        self.parent.update_annotations_from_spans()
-        self.parent.explorer.save_annotations(filename.name)
+        self.app.update_annotations_from_spans()
+        self.app.explorer.save_annotations(filename.name)
 
         showinfo(title=APP_TITTLE, message=f"Annotations saved to {filename.name}")
 
@@ -342,12 +328,15 @@ class BottomFrame(tk.Frame):
 
 
 class LeadsMenuFrame(tk.Frame):
-    def __init__(self, parent: MainApplication, *args, **kwargs):
+    def __init__(self, parent: tk.Frame, app: MainApplication, *args, **kwargs):
         tk.Frame.__init__(self, parent, *args, **kwargs)
-        self.parent = parent
+
+        self.app = app
+
         self.leads_listbox = tk.Listbox(
             self, height=3, selectmode=tk.MULTIPLE, state=tk.DISABLED
         )
+
         scrollbar = ttk.Scrollbar(
             self,
             orient=tk.VERTICAL,
@@ -363,7 +352,6 @@ class LeadsMenuFrame(tk.Frame):
             command=self._select_all_leads,
             state=tk.DISABLED,
         )
-        self.select_all_button.pack(side=tk.LEFT, expand=True)
 
         self.clear_all_button = tk.Button(
             self.select_buttons_frame,
@@ -371,15 +359,17 @@ class LeadsMenuFrame(tk.Frame):
             command=self._clear_all_leads,
             state=tk.DISABLED,
         )
-        self.clear_all_button.pack(side=tk.RIGHT, expand=True)
 
         self.confirm_button = tk.Button(
             self,
             text="Confirm choices",
             command=self._on_confirm_button_click,
             state=tk.DISABLED,
+            bg="orange",
         )
 
+        self.select_all_button.pack(side=tk.LEFT, expand=True, fill=tk.X)
+        self.clear_all_button.pack(side=tk.RIGHT, expand=True, fill=tk.X)
         self.confirm_button.pack(expand=True, side=tk.BOTTOM, fill=tk.X)
         self.select_buttons_frame.pack(expand=True, side=tk.BOTTOM, fill=tk.X)
         self.leads_listbox.pack(expand=True, fill=tk.BOTH, side=tk.LEFT)
@@ -411,7 +401,7 @@ class LeadsMenuFrame(tk.Frame):
         should_continue = tk.messagebox.askyesno(title=APP_TITTLE, message=msg)
 
         if should_continue:
-            self.parent.selected_leads_names.set(currently_selected)
+            self.app.selected_leads_names.set(currently_selected)
 
     def activate_widgets(self):
         self.leads_listbox.configure(state=tk.NORMAL)
