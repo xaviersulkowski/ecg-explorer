@@ -1,4 +1,5 @@
-resources
+resources/
 .idea
 __pycache__
 *.pyc
+.DS_Store

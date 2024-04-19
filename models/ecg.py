@@ -5,7 +5,7 @@ import numpy as np
 import pydicom as dicom
 
 from dataclasses import dataclass, field
-from typing import Any, Optional, Collection, TypeAlias
+from typing import Any, Optional, TypeAlias
 
 from models.annotation import Annotation
 
@@ -33,17 +33,27 @@ class ECGLead:
         ]
 
     def calculate_qrs_areas(self):
-        return [
-            np.round(
-                np.trapz(np.abs(self.raw_waveform[pos.onset : pos.offset])), decimals=2
+        if self.units == "microvolt":
+            waveform = self.raw_waveform
+        else:
+            RuntimeError("Unit not known")
+
+        areas = np.zeros(len(self.ann.qrs_complex_positions or []))
+
+        for cnt, pos in enumerate(self.ann.qrs_complex_positions or []):
+            waveform_abs = np.abs(waveform[pos.onset:pos.offset])
+
+            areas[cnt] = np.trapz(
+                waveform_abs,
+                dx=1/self.fs
             )
-            for pos in self.ann.qrs_complex_positions or []
-        ]
+
+        return map(lambda x: f"{x:.2f}", areas.tolist())
 
 
 class ECGContainer:
-    def __init__(self, ecg_leads: Collection[ECGLead], raw: Any):
-        self.ecg_leads: Collection[ECGLead] = ecg_leads
+    def __init__(self, ecg_leads: list[ECGLead], raw: Any):
+        self.ecg_leads: list[ECGLead] = ecg_leads
         self.raw: Any = raw
 
     @property
