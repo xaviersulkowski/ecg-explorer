@@ -47,21 +47,15 @@ class MainApplication(tk.Frame):
 
         # ====== frames & widgets ======
 
-        self.top_pane = tk.Frame(self.parent)
+        self.top_frame = TopFrame(self)
 
         ecg_plot_pack_config = {"fill": tk.BOTH, "side": tk.TOP, "expand": True}
         self.ecg_plot = ECGPlotHandler.empty(self, ecg_plot_pack_config)
 
-        self.top_pane.pack(fill=tk.BOTH, side=tk.TOP)
+        self.top_frame.pack(fill=tk.BOTH, side=tk.TOP)
         self.ecg_plot.pack(**ecg_plot_pack_config)
 
-        self.action_buttons_frame = ActionButtonsFrame(self.top_pane, self)
-        self.action_buttons_frame.pack(anchor=tk.NW, side=tk.LEFT, fill=tk.Y)
-
-        self.leads_menu_frame = LeadsMenuFrame(self.top_pane, self)
-        self.leads_menu_frame.pack(anchor=tk.E, side=tk.RIGHT, padx=10, pady=10)
-
-        self.bottom_frame = BottomFrame(self.parent, self)
+        self.bottom_frame = BottomFrame(self)
         self.bottom_frame.pack(side=tk.BOTTOM, fill=tk.BOTH)
 
     def _on_lead_change(self, *_):
@@ -84,9 +78,8 @@ class MainApplication(tk.Frame):
 
     def load_signal(self, filename: str):
         def enable_options_on_signal_load():
-            self.action_buttons_frame.activate_widgets()
+            self.top_frame.activate_widgets()
             self.bottom_frame.activate_widgets()
-            self.leads_menu_frame.activate_widgets()
 
         self.explorer = ECGExplorer.load_from_file(filename)
         self.container = self.explorer.container
@@ -102,8 +95,7 @@ class MainApplication(tk.Frame):
             x.label: cnt for cnt, x in enumerate(self.container.ecg_leads)
         }
 
-        self.leads_menu_frame.reload_leads_menu(self.leads_mapping)
-        self.leads_menu_frame.leads_listbox.selection_set(0)
+        self.top_frame.reload_leads_menu(self.leads_mapping)
 
         self.selected_leads = [
             self.get_lead(list(self.leads_mapping.keys())[0]),
@@ -179,12 +171,31 @@ class MainApplication(tk.Frame):
         exit()
 
 
+class TopFrame(tk.Frame):
+    def __init__(self, parent: MainApplication, *args, **kwargs):
+        tk.Frame.__init__(self, parent, *args, **kwargs)
+        self.app = parent
+
+        self.action_buttons_frame = ActionButtonsFrame(self)
+        self.action_buttons_frame.pack(anchor=tk.NW, side=tk.LEFT, fill=tk.Y)
+
+        self.leads_menu_frame = LeadsMenuFrame(self)
+        self.leads_menu_frame.pack(anchor=tk.E, side=tk.RIGHT, padx=10, pady=10)
+
+    def activate_widgets(self):
+        self.action_buttons_frame.activate_widgets()
+        self.leads_menu_frame.activate_widgets()
+
+    def reload_leads_menu(self, new_mapping):
+        self.leads_menu_frame.reload_leads_menu(new_mapping)
+        self.leads_menu_frame.leads_listbox.selection_set(0)
+
+
 class ActionButtonsFrame(tk.Frame):
-    def __init__(self, parent: tk.Frame, app: MainApplication, *args, **kwargs):
+    def __init__(self, parent: TopFrame, *args, **kwargs):
         tk.Frame.__init__(self, parent, *args, **kwargs)
 
-        self.parent = parent
-        self.app = app
+        self.app = parent.app
 
         self.open_button = tk.Button(
             self, text="Select ECG file", command=self._select_file, bg="ivory4"
@@ -276,11 +287,10 @@ class ActionButtonsFrame(tk.Frame):
 
 
 class BottomFrame(tk.Frame):
-    def __init__(self, parent: tk.Frame, app: MainApplication, *args, **kwargs):
+    def __init__(self, parent: MainApplication, *args, **kwargs):
         tk.Frame.__init__(self, parent, *args, **kwargs)
 
         self.parent = parent
-        self.app = app
 
         self.save_annotations_button = tk.Button(
             self,
@@ -293,13 +303,13 @@ class BottomFrame(tk.Frame):
             self,
             text="Generate report",
             state=tk.DISABLED,
-            command=self.app.generate_report,
+            command=self.parent.generate_report,
         )
 
         self.quit = tk.Button(
             self,
             text="Quit",
-            command=self.app.exit_main,
+            command=self.parent.exit_main,
             bg="ivory4",
         )
 
@@ -310,15 +320,15 @@ class BottomFrame(tk.Frame):
     def _on_save_annotations(self):
         filename = fd.asksaveasfile(
             mode="w",
-            initialfile=f"{self.app.file_name}.annx",
+            initialfile=f"{self.parent.file_name}.annx",
             defaultextension=".annx",
         )
 
         if filename is None:
             return
 
-        self.app.update_annotations_from_spans()
-        self.app.explorer.save_annotations(filename.name)
+        self.parent.update_annotations_from_spans()
+        self.parent.explorer.save_annotations(filename.name)
 
         showinfo(title=APP_TITTLE, message=f"Annotations saved to {filename.name}")
 
@@ -328,10 +338,10 @@ class BottomFrame(tk.Frame):
 
 
 class LeadsMenuFrame(tk.Frame):
-    def __init__(self, parent: tk.Frame, app: MainApplication, *args, **kwargs):
+    def __init__(self, parent: TopFrame, *args, **kwargs):
         tk.Frame.__init__(self, parent, *args, **kwargs)
 
-        self.app = app
+        self.app = parent.app
 
         self.leads_listbox = tk.Listbox(
             self, height=3, selectmode=tk.MULTIPLE, state=tk.DISABLED
