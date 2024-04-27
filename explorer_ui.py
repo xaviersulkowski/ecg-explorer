@@ -61,7 +61,7 @@ class MainApplication(tk.Frame):
         self.leads_menu_frame = LeadsMenuFrame(self.top_pane, self)
         self.leads_menu_frame.pack(anchor=tk.E, side=tk.RIGHT, padx=10, pady=10)
 
-        self.bottom_frame = BottomFrame(self.parent, self)
+        self.bottom_frame = BottomFrame(self)
         self.bottom_frame.pack(side=tk.BOTTOM, fill=tk.BOTH)
 
     def _on_lead_change(self, *_):
@@ -276,11 +276,10 @@ class ActionButtonsFrame(tk.Frame):
 
 
 class BottomFrame(tk.Frame):
-    def __init__(self, parent: tk.Frame, app: MainApplication, *args, **kwargs):
+    def __init__(self, parent: MainApplication, *args, **kwargs):
         tk.Frame.__init__(self, parent, *args, **kwargs)
 
         self.parent = parent
-        self.app = app
 
         self.save_annotations_button = tk.Button(
             self,
@@ -293,13 +292,13 @@ class BottomFrame(tk.Frame):
             self,
             text="Generate report",
             state=tk.DISABLED,
-            command=self.app.generate_report,
+            command=self.parent.generate_report,
         )
 
         self.quit = tk.Button(
             self,
             text="Quit",
-            command=self.app.exit_main,
+            command=self.parent.exit_main,
             bg="ivory4",
         )
 
@@ -310,15 +309,15 @@ class BottomFrame(tk.Frame):
     def _on_save_annotations(self):
         filename = fd.asksaveasfile(
             mode="w",
-            initialfile=f"{self.app.file_name}.annx",
+            initialfile=f"{self.parent.file_name}.annx",
             defaultextension=".annx",
         )
 
         if filename is None:
             return
 
-        self.app.update_annotations_from_spans()
-        self.app.explorer.save_annotations(filename.name)
+        self.parent.update_annotations_from_spans()
+        self.parent.explorer.save_annotations(filename.name)
 
         showinfo(title=APP_TITTLE, message=f"Annotations saved to {filename.name}")
 
