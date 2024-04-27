@@ -365,7 +365,6 @@ class LeadsMenuFrame(tk.Frame):
             text="Confirm choices",
             command=self._on_confirm_button_click,
             state=tk.DISABLED,
-            bg="orange",
         )
 
         self.select_all_button.pack(side=tk.LEFT, expand=True, fill=tk.X)

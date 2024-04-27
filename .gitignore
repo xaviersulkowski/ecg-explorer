@@ -3,3 +3,6 @@ resources/
 __pycache__
 *.pyc
 .DS_Store
+installer/dist/
+installer/build/
+installer/spec/
