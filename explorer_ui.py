@@ -107,7 +107,7 @@ class MainApplication(tk.Frame):
         self.ecg_plot.update_ecg_container(self.container)
         self.ecg_plot.plot_waveforms_for_selected_leads(self.selected_leads)
 
-        self.top_frame.description_frame.update_description(self.container.description)
+        self.top_frame.description_frame.update_description(self.container)
 
     def process_signal(self):
         self.explorer.process()
@@ -197,21 +197,36 @@ class TopFrame(tk.Frame):
 
 
 class DescriptionFrame(tk.Frame):
+
+    PATH_PREFIX = "path: "
+
     def __init__(self, parent: TopFrame, *args, **kwargs):
         tk.Frame.__init__(self, parent, *args, **kwargs)
 
         self.app = parent.app
 
-        self.description = tk.Text(self, height=2)
-        self.description.insert(tk.END, "")
-        self.description.config(state=tk.DISABLED)
-        self.description.pack()
+        self.path = tk.Text(self, height=2)
+        self._setup_text_container(self.path, self.PATH_PREFIX)
 
-    def update_description(self, text: str):
-        self.description.config(state=tk.NORMAL)
-        self.description.delete(tk.END)
-        self.description.insert(tk.END, text)
-        self.description.config(state=tk.DISABLED)
+        self.description = tk.Text(self, height=2)
+        self._setup_text_container(self.description, "")
+
+    def update_description(self, container: ECGContainer):
+        self._write_text(self.path, container.file_path, len(self.PATH_PREFIX))
+        self._write_text(self.description, container.description, len(""))
+
+    @staticmethod
+    def _setup_text_container(text_c: tk.Text, prefix: str):
+        text_c.insert(tk.END, "" + prefix)
+        text_c.config(state=tk.DISABLED)
+        text_c.pack()
+
+    @staticmethod
+    def _write_text(text_c: tk.Text, text: str, prefix_len: float):
+        text_c.config(state=tk.NORMAL)
+        text_c.delete(prefix_len + 1.0, tk.END)
+        text_c.insert(tk.END, text)
+        text_c.config(state=tk.DISABLED)
 
 
 class ActionButtonsFrame(tk.Frame):
@@ -409,7 +424,6 @@ class LeadsMenuFrame(tk.Frame):
 
     def _clear_all_leads(self):
         self.leads_listbox.selection_clear(0, self.leads_listbox.size())
-        self.leads_listbox.selection_set(0)
 
     def _select_all_leads(self):
         self.leads_listbox.selection_set(0, self.leads_listbox.size())

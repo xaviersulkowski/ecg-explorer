@@ -52,10 +52,11 @@ class ECGLead:
 
 
 class ECGContainer:
-    def __init__(self, ecg_leads: list[ECGLead], raw: Any, description: str):
+    def __init__(self, ecg_leads: list[ECGLead], raw: Any, description: str, file_path: str):
         self.ecg_leads: list[ECGLead] = ecg_leads
         self.raw: Any = raw
         self.description: str = description
+        self.file_path: str = file_path
 
     @property
     def n_leads(self):
@@ -94,7 +95,7 @@ class ECGContainer:
                 )
             )
 
-        return cls(leads, raw, f"{raw.PatientName.given_name} {raw.PatientName.family_name}")
+        return cls(leads, raw, f"{raw.PatientName.given_name} {raw.PatientName.family_name}", path)
 
     def save_annotations(self, filename):
         annotations = {lead.label: lead.ann for lead in self.ecg_leads}
