@@ -47,7 +47,6 @@ class ECGExplorer:
             return out
 
         def _safe_mean(data: list[float]) -> Optional[float]:
-
             if all([x is not None for x in data]):
                 return float(f"{(sum(data) / len(data)):.2f}")
             else:
