@@ -74,11 +74,12 @@ class MainApplication(tk.Frame):
         self.selected_leads = selected_leads
 
         # 2. re-draw waveforms and create new axes objects
-        self.ecg_plot.plot_waveforms_for_selected_leads(self.selected_leads, self.show_processed_signal.get())
+        self.ecg_plot.plot_waveforms_for_selected_leads(
+            self.selected_leads, self.show_processed_signal.get()
+        )
 
         # 3. re-draw annotations if any
         self.ecg_plot.draw_annotations_for_selected_leads()
-
 
     def get_lead(self, lead_name: str) -> ECGLead:
         return self.container.ecg_leads[self.leads_mapping[lead_name]]
@@ -105,9 +106,7 @@ class MainApplication(tk.Frame):
 
         self.top_frame.reload_leads_menu(self.leads_mapping)
 
-        self.selected_leads_names.set(
-            [list(self.leads_mapping.keys())[0]]
-        )
+        self.selected_leads_names.set([list(self.leads_mapping.keys())[0]])
 
         self.selected_leads = [
             self.get_lead(self.selected_leads_names.get()[0]),
@@ -117,7 +116,9 @@ class MainApplication(tk.Frame):
         self.spans_per_lead = {x.label: [] for x in self.container.ecg_leads}
 
         self.ecg_plot.update_ecg_container(self.container)
-        self.ecg_plot.plot_waveforms_for_selected_leads(self.selected_leads, self.show_processed_signal.get())
+        self.ecg_plot.plot_waveforms_for_selected_leads(
+            self.selected_leads, self.show_processed_signal.get()
+        )
 
         self.top_frame.description_frame.update_description(self.container)
 
@@ -194,10 +195,17 @@ class TopFrame(tk.Frame):
         self.action_buttons_frame.pack(anchor=tk.NW, side=tk.LEFT, fill=tk.Y)
 
         self.description_frame = DescriptionFrame(self)
-        self.description_frame.pack(anchor=tk.N, side=tk.LEFT, fill=tk.BOTH, padx=10, pady=10, expand=True)
+        self.description_frame.pack(
+            anchor=tk.N, side=tk.LEFT, fill=tk.BOTH, padx=10, pady=10, expand=True
+        )
 
         self.leads_menu_frame = LeadsMenuFrame(self)
-        self.leads_menu_frame.pack(anchor=tk.E, side=tk.RIGHT, padx=10, pady=10, )
+        self.leads_menu_frame.pack(
+            anchor=tk.E,
+            side=tk.RIGHT,
+            padx=10,
+            pady=10,
+        )
 
     def activate_widgets(self):
         self.action_buttons_frame.activate_widgets()
@@ -209,7 +217,6 @@ class TopFrame(tk.Frame):
 
 
 class DescriptionFrame(tk.Frame):
-
     PATH_PREFIX = "path: "
 
     def __init__(self, parent: TopFrame, *args, **kwargs):
@@ -281,11 +288,11 @@ class ActionButtonsFrame(tk.Frame):
             state=tk.DISABLED,
         )
 
-        self.open_button.grid(row=0, column=0, padx=5, pady=5, sticky='nesw')
-        self.load_ann_button.grid(row=1, column=0, padx=5, pady=5, sticky='nesw')
-        self.process_ecg_button.grid(row=0, column=1, padx=5, pady=5, sticky='nesw')
-        self.clear_ann_button.grid(row=1, column=1, padx=5, pady=5, sticky='nesw')
-        self.processed_button.grid(row=2, column=0, padx=5, pady=5, sticky='nesw')
+        self.open_button.grid(row=0, column=0, padx=5, pady=5, sticky="nesw")
+        self.load_ann_button.grid(row=1, column=0, padx=5, pady=5, sticky="nesw")
+        self.process_ecg_button.grid(row=0, column=1, padx=5, pady=5, sticky="nesw")
+        self.clear_ann_button.grid(row=1, column=1, padx=5, pady=5, sticky="nesw")
+        self.processed_button.grid(row=2, column=0, padx=5, pady=5, sticky="nesw")
 
     def _select_file(self):
         filetypes = (("Dicom files", "*.dcm"),)
@@ -639,8 +646,16 @@ class ECGPlotHandler(tk.Frame):
         ax.set_xticklabels(x_ticks)
         ax.xaxis.set_tick_params(labelsize=9)
 
-        y_min_round_half_down = round((min(waveform) - (0.5 if (abs(min(waveform)) * 2 % 1) < .5 else 0)) * 2) / 2
-        y_max_round_half_up = round((max(waveform) + (0.5 if (max(waveform) * 2 % 1) < .5 else 0)) * 2) / 2
+        y_min_round_half_down = (
+            round(
+                (min(waveform) - (0.5 if (abs(min(waveform)) * 2 % 1) < 0.5 else 0)) * 2
+            )
+            / 2
+        )
+        y_max_round_half_up = (
+            round((max(waveform) + (0.5 if (max(waveform) * 2 % 1) < 0.5 else 0)) * 2)
+            / 2
+        )
 
         y = np.arange(y_min_round_half_down - 1, y_max_round_half_up + 1, 0.5)
         ax.set_yticks(y)

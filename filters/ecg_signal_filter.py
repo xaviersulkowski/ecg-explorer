@@ -6,7 +6,12 @@ from models.ecg import ECGContainer, ECGLead
 
 
 class BandPassEcgSignalFilter:
-    def __init__(self, lowcut_frequency: float = 2.0, highcut_frequency: float = 15.0, order: int = 1):
+    def __init__(
+        self,
+        lowcut_frequency: float = 2.0,
+        highcut_frequency: float = 15.0,
+        order: int = 1,
+    ):
         self.filter_lowcut_frequency = lowcut_frequency
         self.filter_highcut_frequency = highcut_frequency
         self.filter_order = order

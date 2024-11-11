@@ -41,18 +41,17 @@ class ECGLead:
         areas = np.zeros(len(self.ann.qrs_complex_positions or []))
 
         for cnt, pos in enumerate(self.ann.qrs_complex_positions or []):
-            waveform_abs = np.abs(waveform[pos.onset:pos.offset])
+            waveform_abs = np.abs(waveform[pos.onset : pos.offset])
 
-            areas[cnt] = np.trapz(
-                waveform_abs,
-                dx=1/self.fs
-            )
+            areas[cnt] = np.trapz(waveform_abs, dx=1 / self.fs)
 
         return map(lambda x: f"{x:.2f}", areas.tolist())
 
 
 class ECGContainer:
-    def __init__(self, ecg_leads: list[ECGLead], raw: Any, description: str, file_path: str):
+    def __init__(
+        self, ecg_leads: list[ECGLead], raw: Any, description: str, file_path: str
+    ):
         self.ecg_leads: list[ECGLead] = ecg_leads
         self.raw: Any = raw
         self.description: str = description
@@ -95,7 +94,12 @@ class ECGContainer:
                 )
             )
 
-        return cls(leads, raw, f"{raw.PatientName.given_name} {raw.PatientName.family_name}", path)
+        return cls(
+            leads,
+            raw,
+            f"{raw.PatientName.given_name} {raw.PatientName.family_name}",
+            path,
+        )
 
     def save_annotations(self, filename):
         annotations = {lead.label: lead.ann for lead in self.ecg_leads}
