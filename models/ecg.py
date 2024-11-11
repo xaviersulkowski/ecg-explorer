@@ -5,7 +5,7 @@ import numpy as np
 import pydicom as dicom
 
 from dataclasses import dataclass, field
-from typing import Any, Optional, TypeAlias
+from typing import Any, Optional, TypeAlias, List
 
 from models.annotation import Annotation
 
@@ -26,13 +26,13 @@ class ECGLead:
     def __repr__(self):
         return f"\n{self.label}: \n\tunits: {self.units} \n\tsampling: {self.fs}Hz \n\tdata: {self.waveform}\n"
 
-    def calculate_qrs_lengths(self):
+    def calculate_qrs_lengths(self) -> List[float]:
         return [
             (pos.offset - pos.onset) / self.fs * 1000
             for pos in self.ann.qrs_complex_positions or []
         ]
 
-    def calculate_qrs_areas(self):
+    def calculate_qrs_areas(self) -> list[float]:
         if self.units == "microvolt":
             waveform = self.raw_waveform
         else:
@@ -45,7 +45,7 @@ class ECGLead:
 
             areas[cnt] = np.trapz(waveform_abs, dx=1 / self.fs)
 
-        return map(lambda x: f"{x:.2f}", areas.tolist())
+        return list(map(lambda x: float(f"{x:.2f}"), areas.tolist()))
 
 
 class ECGContainer:

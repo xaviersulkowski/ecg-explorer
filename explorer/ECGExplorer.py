@@ -1,4 +1,6 @@
 import os
+from typing import Optional
+
 import pandas as pd
 
 from detectors.qrs_detectors import PanTompkinsDetector
@@ -44,6 +46,13 @@ class ECGExplorer:
                 out[cnt] = l
             return out
 
+        def _safe_mean(data: list[float]) -> Optional[float]:
+
+            if all([x is not None for x in data]):
+                return float(f"{(sum(data) / len(data)):.2f}")
+            else:
+                return None
+
         report = pd.DataFrame()
 
         max_size = max(
@@ -53,12 +62,15 @@ class ECGExplorer:
         for lead in self._container.ecg_leads:
             column_root = lead.label.lower().replace(" ", "_")
 
-            report[f"{column_root}_width_ms"] = pd.Series(
-                _padded(lead.calculate_qrs_lengths(), max_size)
-            )
-            report[f"{column_root}_area_uV.s"] = pd.Series(
-                _padded(lead.calculate_qrs_areas(), max_size)
-            )
+            qrs_lengths = _padded(lead.calculate_qrs_lengths(), max_size)
+            # None to add one empty line before mean value
+            qrs_lengths.append([None, _safe_mean(qrs_lengths)])
+            qrs_areas = _padded(lead.calculate_qrs_areas(), max_size)
+            # None to add one empty line before mean value
+            qrs_areas.append([None, _safe_mean(qrs_areas)])
+
+            report[f"{column_root}_width_ms"] = pd.Series(qrs_lengths)
+            report[f"{column_root}_area_uV.s"] = pd.Series(qrs_areas)
 
         return report
 
