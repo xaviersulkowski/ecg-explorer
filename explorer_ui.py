@@ -40,7 +40,7 @@ class MainApplication(tk.Frame):
         self.spans_per_lead: dict[LeadName, list[Span]] = {}
 
         self.show_processed_signal = tk.BooleanVar()
-        self.show_processed_signal.set(False)
+        self.show_processed_signal.set(True)
 
         self.file_path: Optional[str] = None
         self.file_name: Optional[str] = None
@@ -59,19 +59,26 @@ class MainApplication(tk.Frame):
         self.bottom_frame.pack(side=tk.BOTTOM, fill=tk.BOTH)
 
     def _on_lead_change(self, *_):
-        selected_leads = [
-            self.get_lead(lead_name) for lead_name in self.selected_leads_names.get()
-        ]
-        self.selected_leads = selected_leads
-
         # 1. remove all existing span artists
         self.ecg_plot.clear_annotations()
 
+        # 2. replot waveform
+        self.replot_waveform_with_selected_leads()
+
+    def replot_waveform_with_selected_leads(self):
+        # 1. get selected leads
+        selected_leads = [
+            self.get_lead(lead_name) for lead_name in self.selected_leads_names.get()
+        ]
+
+        self.selected_leads = selected_leads
+
         # 2. re-draw waveforms and create new axes objects
-        self.ecg_plot.plot_waveforms_for_selected_leads(self.selected_leads)
+        self.ecg_plot.plot_waveforms_for_selected_leads(self.selected_leads, self.show_processed_signal.get())
 
         # 3. re-draw annotations if any
         self.ecg_plot.draw_annotations_for_selected_leads()
+
 
     def get_lead(self, lead_name: str) -> ECGLead:
         return self.container.ecg_leads[self.leads_mapping[lead_name]]
@@ -83,6 +90,7 @@ class MainApplication(tk.Frame):
 
         self.explorer = ECGExplorer.load_from_file(filename)
         self.container = self.explorer.container
+        self.explorer.process()
 
         head, tail = os.path.split(filename)
 
@@ -97,15 +105,19 @@ class MainApplication(tk.Frame):
 
         self.top_frame.reload_leads_menu(self.leads_mapping)
 
+        self.selected_leads_names.set(
+            [list(self.leads_mapping.keys())[0]]
+        )
+
         self.selected_leads = [
-            self.get_lead(list(self.leads_mapping.keys())[0]),
+            self.get_lead(self.selected_leads_names.get()[0]),
         ]
 
         self.ecg_plot.clear_annotations()
         self.spans_per_lead = {x.label: [] for x in self.container.ecg_leads}
 
         self.ecg_plot.update_ecg_container(self.container)
-        self.ecg_plot.plot_waveforms_for_selected_leads(self.selected_leads)
+        self.ecg_plot.plot_waveforms_for_selected_leads(self.selected_leads, self.show_processed_signal.get())
 
         self.top_frame.description_frame.update_description(self.container)
 
@@ -259,11 +271,21 @@ class ActionButtonsFrame(tk.Frame):
             command=self._clear_annotations,
             state=tk.DISABLED,
         )
+        self.processed_button = tk.Checkbutton(
+            self,
+            text="Show processed signal",
+            variable=self.app.show_processed_signal,
+            onvalue=1,
+            offvalue=0,
+            command=self.app.replot_waveform_with_selected_leads,
+            state=tk.DISABLED,
+        )
 
         self.open_button.grid(row=0, column=0, padx=5, pady=5, sticky='nesw')
         self.load_ann_button.grid(row=1, column=0, padx=5, pady=5, sticky='nesw')
         self.process_ecg_button.grid(row=0, column=1, padx=5, pady=5, sticky='nesw')
         self.clear_ann_button.grid(row=1, column=1, padx=5, pady=5, sticky='nesw')
+        self.processed_button.grid(row=2, column=0, padx=5, pady=5, sticky='nesw')
 
     def _select_file(self):
         filetypes = (("Dicom files", "*.dcm"),)
@@ -322,6 +344,7 @@ class ActionButtonsFrame(tk.Frame):
         self.process_ecg_button.configure(state=tk.NORMAL)
         self.load_ann_button.configure(state=tk.NORMAL)
         self.clear_ann_button.configure(state=tk.NORMAL)
+        self.processed_button.configure(state=tk.NORMAL)
 
 
 class BottomFrame(tk.Frame):
@@ -637,9 +660,10 @@ class ECGPlotHandler(tk.Frame):
 
     def draw_annotations_for_selected_leads(self):
         for lead in self.parent.selected_leads:
-            for span in self.parent.spans_per_lead[lead.label]:
-                ax_props = self.ax_properties[lead.label]
-                span.create_artist(ax_props.ax)
+            if self.parent.spans_per_lead.get(lead.label) is not None:
+                for span in self.parent.spans_per_lead[lead.label]:
+                    ax_props = self.ax_properties[lead.label]
+                    span.create_artist(ax_props.ax)
 
         self.canvas.draw()
 
