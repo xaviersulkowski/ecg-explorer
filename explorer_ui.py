@@ -1,3 +1,4 @@
+import logging
 import os
 import math
 import tkinter as tk
@@ -12,9 +13,10 @@ from matplotlib.backend_bases import MouseEvent, KeyEvent
 from tkinter import ttk
 from tkinter import filedialog as fd
 from tkinter.messagebox import showinfo
-from typing import Optional
+from typing import Optional, Callable
 
 from explorer.ECGExplorer import ECGExplorer
+from filters.ecg_signal_filter import FilterConfig, FilterMethods
 from models.annotation import QRSComplex
 from models.ecg import ECGContainer, ECGLead, LeadName
 from models.ui_models import Span, AxProperties
@@ -22,6 +24,7 @@ from models.ui_models import Span, AxProperties
 APP_TITTLE = "ECG explorer"
 matplotlib.use("Agg")
 
+logging.basicConfig(level=logging.INFO)
 
 class MainApplication(tk.Frame):
     def __init__(self, parent, *args, **kwargs):
@@ -44,6 +47,7 @@ class MainApplication(tk.Frame):
 
         self.file_path: Optional[str] = None
         self.file_name: Optional[str] = None
+        self.app_filter_config = FilterConfig.default_bandpass()
 
         # ====== frames & widgets ======
 
@@ -89,7 +93,7 @@ class MainApplication(tk.Frame):
             self.top_frame.activate_widgets()
             self.bottom_frame.activate_widgets()
 
-        self.explorer = ECGExplorer.load_from_file(filename)
+        self.explorer = ECGExplorer.load_from_file(filename, self.app_filter_config)
         self.container = self.explorer.container
         self.explorer.process()
 
@@ -278,6 +282,14 @@ class ActionButtonsFrame(tk.Frame):
             command=self._clear_annotations,
             state=tk.DISABLED,
         )
+
+        self.filters_setting_button = tk.Button(
+            self,
+            text="Filter settings",
+            command=self.open_settings_window,
+            state=tk.NORMAL,
+        )
+
         self.processed_button = tk.Checkbutton(
             self,
             text="Show processed signal",
@@ -292,10 +304,32 @@ class ActionButtonsFrame(tk.Frame):
         self.load_ann_button.grid(row=1, column=0, padx=5, pady=5, sticky="nesw")
         self.process_ecg_button.grid(row=0, column=1, padx=5, pady=5, sticky="nesw")
         self.clear_ann_button.grid(row=1, column=1, padx=5, pady=5, sticky="nesw")
-        self.processed_button.grid(row=2, column=0, padx=5, pady=5, sticky="nesw")
+        self.filters_setting_button.grid(row=2, column=0, padx=5, pady=5, sticky="nesw")
+        self.processed_button.grid(row=3, column=0, padx=5, pady=5, sticky="nesw")
+
+        self.filters_setting_window = None
+
+    def open_settings_window(self):
+        if self.filters_setting_window is None:
+            self.filters_setting_window = FilterSettingsWindow(
+                self,
+                self.settings_window_on_close_callback,
+                self.settings_window_filter_changed_callback,
+            )
+
+    def settings_window_filter_changed_callback(self):
+        if self.app.container is not None:
+            self.app.explorer.filter_config = self.app.app_filter_config
+            self.app.explorer.process()
+            self.app.replot_waveform_with_selected_leads()
+        else:
+            logging.info("No filter changes")
+
+    def settings_window_on_close_callback(self):
+        self.filters_setting_window = None
 
     def _select_file(self):
-        filetypes = (("Dicom files", "*.dcm"),)
+        filetypes = (("Dicom files", "*.dcm"), ("XML files", "*.Xml"))
 
         filename = fd.askopenfilename(
             title="Open a file", initialdir="./", filetypes=filetypes
@@ -519,7 +553,7 @@ class ECGPlotHandler(tk.Frame):
         self.ecg_container = ecg_container
 
     def plot_waveforms_for_selected_leads(
-        self, leads: list[ECGLead], show_processed_signal: bool = False
+            self, leads: list[ECGLead], show_processed_signal: bool = False
     ):
         self._create_subplots(leads)
 
@@ -549,7 +583,7 @@ class ECGPlotHandler(tk.Frame):
         self.canvas.draw()
 
     def _set_selected_span(
-        self, lead_name: str, ax: plt.Axes, onset: float, offset: float
+            self, lead_name: str, ax: plt.Axes, onset: float, offset: float
     ):
         if onset == offset:
             return
@@ -623,19 +657,19 @@ class ECGPlotHandler(tk.Frame):
         self.ax_properties = axes
 
     def _plot_waveform(
-        self,
-        lead: ECGLead,
-        ax: plt.Axes,
-        line: plt.Line2D,
-        show_processed_signal: bool = False,
+            self,
+            lead: ECGLead,
+            ax: plt.Axes,
+            line: plt.Line2D,
+            show_processed_signal: bool = False,
     ):
         waveform = lead.waveform if show_processed_signal else lead.raw_waveform
 
         # scale to milli-volts
-        if lead.units == "microvolt":
+        if lead.units == "uV":
             waveform = waveform / 1000
         else:
-            RuntimeError("Unit not known")
+            raise RuntimeError("Unit not known")
 
         line.set_data(range(len(waveform)), waveform)
 
@@ -728,6 +762,106 @@ class ECGPlotHandler(tk.Frame):
         self.mouse_event = None
         self.canvas.draw()
 
+class FilterSettingsWindow(tk.Toplevel):
+    def __init__(
+        self,
+        parent: ActionButtonsFrame,
+        on_close_callback: Callable,
+        on_filter_change_callback: Callable,
+        *args,
+        **kwargs
+    ):
+        tk.Toplevel.__init__(self, parent, *args, **kwargs)
+
+        self.app = parent.app
+        self.on_close_callback = on_close_callback
+        self.on_filter_change_callback = on_filter_change_callback
+
+        self.title("Filter settings")
+
+        tk.Label(self, text="Filtering method [from methods]:").pack(pady=10, padx=10)
+        self.filtering_methods = FilterMethods.get_filtering_methods()
+        self.method_entry = ttk.Combobox(self, values=self.filtering_methods, state="readonly")
+        self.method_entry.set(self.app.app_filter_config.filter_method.value)
+        self.method_entry.pack(pady=10, padx=10)
+        self.method_entry.bind("<<ComboboxSelected>>", self.on_dropdown_change)
+
+        tk.Label(self, text="Lowcut frequency [Hz]:").pack(pady=10, padx=10)
+        self.lowcut_entry = tk.Entry(self)
+        self.lowcut_entry.insert(0, str(self.app.app_filter_config.lowcut_frequency))
+        self.lowcut_entry.pack(pady=10, padx=10)
+
+        tk.Label(self, text="Highcut frequency [Hz]:").pack(pady=10, padx=10)
+        self.highcut_entry = tk.Entry(self)
+        self.highcut_entry.insert(0, str(self.app.app_filter_config.highcut_frequency))
+        self.highcut_entry.pack(pady=10, padx=10)
+
+        tk.Label(self, text="Filter order [number]:").pack(pady=10, padx=10)
+        self.order_entry = tk.Entry(self)
+        self.order_entry.insert(0, str(self.app.app_filter_config.filter_order))
+        self.order_entry.pack(pady=10, padx=10)
+
+        self.save_button = tk.Button(self, text="Save", command=self.save_settings)
+        self.save_button.pack(side=tk.LEFT, padx=10, pady=10)
+
+        self.cancel_button = tk.Button(self, text="Cancel", command=self.on_cancel)
+        self.cancel_button.pack(side=tk.RIGHT, padx=10, pady=10)
+
+    def on_dropdown_change(self, _):
+        if self.method_entry.get() == FilterMethods.LOWPASS.value:
+            self.lowcut_entry.delete(0)
+            self.lowcut_entry.configure(state=tk.DISABLED)
+        else:
+            self.lowcut_entry.configure(state=tk.NORMAL)
+
+    def save_settings(self):
+
+        try:
+            filter_order = int(self.order_entry.get())
+        except ValueError:
+            tk.messagebox.showerror("Error", "Filter order must be integer number")
+            return
+
+        try:
+            highcut_frequency = float(self.highcut_entry.get())
+        except ValueError:
+            tk.messagebox.showerror("Error", "Lowcut frequency must be a dot separated number, e.g. 1.23")
+            return
+
+        lowcut_frequency = None
+        if self.lowcut_entry.get():
+            try:
+                lowcut_frequency = float(self.lowcut_entry.get())
+            except ValueError:
+                tk.messagebox.showerror("Error", "Lowcut frequency must be a dot separated number, e.g. 1.23")
+                return
+
+        filter_method = FilterMethods(self.method_entry.get())
+        if filter_method == FilterMethods.BANDPASS and lowcut_frequency == 0.0:
+            tk.messagebox.showerror("Error", "When filter method is \"bandpass\" lowcut frequency must be non-zero number")
+            return
+
+        filter_config = FilterConfig(
+            filter_method=filter_method,
+            filter_order=filter_order,
+            highcut_frequency=highcut_frequency,
+            lowcut_frequency=lowcut_frequency
+        )
+
+        logging.info(f"Filter config {filter_config}")
+
+        if filter_config != self.app.app_filter_config:
+            self.on_filter_change_callback()
+            self.app.app_filter_config = filter_config
+
+        self.on_close()
+
+    def on_cancel(self):
+        self.on_close()
+
+    def on_close(self):
+        self.destroy()
+        self.on_close_callback()
 
 def _do_spans_overlap(on1, off1, on2, off2):
     if off1 < on2 or off2 < on1:

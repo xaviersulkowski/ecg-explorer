@@ -4,35 +4,55 @@ from typing import Optional
 import pandas as pd
 
 from detectors.qrs_detectors import PanTompkinsDetector
-from filters.ecg_signal_filter import BandPassEcgSignalFilter
+from filters.ecg_signal_filter import FilterConfig, EcgSignalFilter
 from models.annotation import QRSComplex
 from models.ecg import ECGContainer, LeadName
 
 
 class ECGExplorer:
-    def __init__(self, container: ECGContainer):
-        self._container: ECGContainer = container
-        self._filter = BandPassEcgSignalFilter()
+    def __init__(
+        self,
+        container: ECGContainer,
+        filter_config: Optional[FilterConfig] = None,
+    ):
+
+        self._container = container
+        self._filter_config = filter_config
+        self._filter: Optional[EcgSignalFilter] = EcgSignalFilter(filter_config) if filter_config else None
         self._r_detector = PanTompkinsDetector()
 
     @classmethod
-    def load_from_file(cls, filepath: str):
+    def load_from_file(
+        cls,
+        filepath: str,
+        filter_config: Optional[FilterConfig] = None
+    ):
         if not os.path.isfile(filepath):
             raise FileNotFoundError()
 
         ext = os.path.splitext(filepath)[-1].lower()
 
         if ext == ".dcm":
-            return cls(ECGContainer.from_dicom_file(filepath))
+            return cls(ECGContainer.from_dicom_file(filepath), filter_config)
+        if ext.lower() == ".xml":
+            return cls(ECGContainer.from_ge_xml_file(filepath), filter_config)
 
     def process(self):
         self._filter.filter(self._container)
-        self._r_detector.detect(self._container)
+        # self._r_detector.detect(self._container)
 
     @property
     def container(self):
-        # TODO: check if processed
         return self._container
+
+    @property
+    def filter_config(self):
+        return self._filter_config
+
+    @filter_config.setter
+    def filter_config(self, filter_config: FilterConfig):
+        self._filter_config = filter_config
+        self._filter = EcgSignalFilter(self._filter_config)
 
     def overwrite_annotations(self, lead_name: LeadName, qrs: list[QRSComplex]):
         lead = self._container.get_lead(lead_name)
