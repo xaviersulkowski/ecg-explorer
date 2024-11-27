@@ -15,6 +15,7 @@ class AnnotationsManager(Subject):
     """
     ECGPlotHandler should subscribe
     """
+
     def __init__(self):
         super().__init__()
         self._annotations_per_lead: dict[LeadName, list[Span]] = {}
@@ -26,10 +27,14 @@ class AnnotationsManager(Subject):
     @annotations.setter
     def annotations(self, annotations):
         self._annotations_per_lead = annotations
-        self.notify_subscribers(event=AnnotationEvents.ANNOTATIONS_UPDATE, annotations=annotations)
+        self.notify_subscribers(
+            event=AnnotationEvents.ANNOTATIONS_UPDATE, annotations=annotations
+        )
 
     def clear_annotations(self):
-        self._annotations_per_lead = {lead: [] for lead, _ in self._annotations_per_lead.items()}
+        self._annotations_per_lead = {
+            lead: [] for lead, _ in self._annotations_per_lead.items()
+        }
         self.notify_subscribers(event=AnnotationEvents.ANNOTATIONS_DELETE)
 
     def empty_from_ecg_container(self, ecg_container: ECGContainer):

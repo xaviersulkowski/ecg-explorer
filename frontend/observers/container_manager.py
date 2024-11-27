@@ -13,6 +13,7 @@ class ContainerManager(Subject):
     """
     ECGPlotHandler & DescriptionFrame should subscribe
     """
+
     def __init__(self):
         super().__init__()
         self._ecg_container: Optional[ECGContainer] = None
@@ -25,6 +26,5 @@ class ContainerManager(Subject):
     def container(self, ecg_container: ECGContainer):
         self._ecg_container = ecg_container
         self.notify_subscribers(
-            event=ContainerEvents.CONTAINER_UPDATE,
-            container=self._ecg_container
+            event=ContainerEvents.CONTAINER_UPDATE, container=self._ecg_container
         )

@@ -13,8 +13,7 @@ def do_spans_overlap(on1: numeric, off1: numeric, on2: numeric, off2: numeric):
 
 
 def merge_existing_annotations_with_lead(
-    existing_annotations: dict[LeadName, list[Span]],
-    lead: ECGLead
+    existing_annotations: dict[LeadName, list[Span]], lead: ECGLead
 ) -> tuple[LeadName, list[Span]]:
     """
     In case we process signal after we made some manual selections, we want to merge these two types of selections.

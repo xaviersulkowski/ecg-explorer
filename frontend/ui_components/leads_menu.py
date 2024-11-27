@@ -10,13 +10,7 @@ from models.ecg import LeadName
 
 
 class LeadsMenuFrame(tk.Frame, Observer):
-    def __init__(
-        self,
-        parent: tk.Frame,
-        leads_manager: LeadsManager,
-        *args,
-        **kwargs
-    ):
+    def __init__(self, parent: tk.Frame, leads_manager: LeadsManager, *args, **kwargs):
         tk.Frame.__init__(self, parent, *args, **kwargs)
 
         self.leads_manager = leads_manager
@@ -65,7 +59,7 @@ class LeadsMenuFrame(tk.Frame, Observer):
 
     def update_on_notification(self, event: Enum, *args, **kwargs):
         if event == LeadEvents.LEADS_MAPPING_UPDATE:
-            self._reload_leads_menu(kwargs['leads_mapping'])
+            self._reload_leads_menu(kwargs["leads_mapping"])
 
     def _clear_all_leads(self):
         self.leads_listbox.selection_clear(0, self.leads_listbox.size())
@@ -74,7 +68,7 @@ class LeadsMenuFrame(tk.Frame, Observer):
         self.leads_listbox.selection_set(0, self.leads_listbox.size())
 
     def _reload_leads_menu(self, leads_mapping: dict[LeadName, int]):
-        if self.leads_listbox['state'] == tk.DISABLED:
+        if self.leads_listbox["state"] == tk.DISABLED:
             self.leads_listbox.configure(state=tk.NORMAL)
 
         self.leads_listbox.delete(0, self.leads_listbox.size())

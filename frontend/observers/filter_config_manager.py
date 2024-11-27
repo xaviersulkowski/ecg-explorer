@@ -14,6 +14,7 @@ class FilterManager(Subject):
     """
     ECGPlotHandler should subscribe
     """
+
     def __init__(self):
         super().__init__()
         self._filter_config: Optional[FilterConfig] = None

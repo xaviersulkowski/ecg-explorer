@@ -24,17 +24,18 @@ class TopFrame(tk.Frame):
     """
     This class only arranges views. It has no actual functionality.
     """
+
     def __init__(
-            self,
-            parent: tk.Frame,
-            leads_manager: LeadsManager,
-            annotations_manager: AnnotationsManager,
-            container_manager: ContainerManager,
-            filter_manager: FilterManager,
-            load_signal_callback: Callable,
-            app_variables: AppVariables,
-            *args,
-            **kwargs
+        self,
+        parent: tk.Frame,
+        leads_manager: LeadsManager,
+        annotations_manager: AnnotationsManager,
+        container_manager: ContainerManager,
+        filter_manager: FilterManager,
+        load_signal_callback: Callable,
+        app_variables: AppVariables,
+        *args,
+        **kwargs,
     ):
         tk.Frame.__init__(self, parent, *args, **kwargs)
 
@@ -53,10 +54,7 @@ class TopFrame(tk.Frame):
             anchor=tk.N, side=tk.LEFT, fill=tk.BOTH, padx=10, pady=10, expand=True
         )
 
-        self.leads_menu_frame = LeadsMenuFrame(
-            self,
-            leads_manager
-        )
+        self.leads_menu_frame = LeadsMenuFrame(self, leads_manager)
         self.leads_menu_frame.pack(
             anchor=tk.E,
             side=tk.RIGHT,
@@ -97,7 +95,7 @@ class DescriptionFrame(tk.Frame, Observer):
 
     def update_on_notification(self, event: Enum, *args, **kwargs):
         if event == ContainerEvents.CONTAINER_UPDATE:
-            self._update_description(kwargs['container'])
+            self._update_description(kwargs["container"])
 
     def _update_description(self, container: ECGContainer):
         self._write_text(self.path, self.PATH_PREFIX + container.file_path)
@@ -121,15 +119,15 @@ class DescriptionFrame(tk.Frame, Observer):
 
 class ActionButtonsFrame(tk.Frame):
     def __init__(
-            self,
-            parent: tk.Frame,
-            app_variables: AppVariables,
-            container_manager: ContainerManager,
-            annotations_manager: AnnotationsManager,
-            filter_manager: FilterManager,
-            load_signal_callback: Callable,
-            *args,
-            **kwargs
+        self,
+        parent: tk.Frame,
+        app_variables: AppVariables,
+        container_manager: ContainerManager,
+        annotations_manager: AnnotationsManager,
+        filter_manager: FilterManager,
+        load_signal_callback: Callable,
+        *args,
+        **kwargs,
     ):
         tk.Frame.__init__(self, parent, *args, **kwargs)
 
@@ -140,7 +138,10 @@ class ActionButtonsFrame(tk.Frame):
         self.load_signal_callback = load_signal_callback
 
         self.open_button = tk.Button(
-            self, text="Select ECG file", command=self._select_file_callback, bg="ivory4"
+            self,
+            text="Select ECG file",
+            command=self._select_file_callback,
+            bg="ivory4",
         )
 
         self.process_ecg_button = tk.Button(
@@ -176,7 +177,9 @@ class ActionButtonsFrame(tk.Frame):
 
         def set_show_processed():
             self.filter_manager.show_filtered = show_processed.get()
-            logging.info(f"Set \"show filtered\" variable as {filter_manager.show_filtered}")
+            logging.info(
+                f'Set "show filtered" variable as {filter_manager.show_filtered}'
+            )
 
         self.processed_button = tk.Checkbutton(
             self,
@@ -198,14 +201,15 @@ class ActionButtonsFrame(tk.Frame):
         self.filters_setting_window = None
 
     def _process_signal_callback(self):
-
         logging.info("Processing signal")
 
         self.app_variables.explorer.process()
 
         updated_annotations = {}
         for lead in self.container_manager.container.ecg_leads:
-            lead_name, annotations = merge_existing_annotations_with_lead(self.annotations_manager.annotations, lead)
+            lead_name, annotations = merge_existing_annotations_with_lead(
+                self.annotations_manager.annotations, lead
+            )
             updated_annotations[lead_name] = annotations
 
         self.annotations_manager.annotations = updated_annotations
@@ -260,7 +264,9 @@ class ActionButtonsFrame(tk.Frame):
 
         updated_annotations = {}
         for lead in self.container_manager.container.ecg_leads:
-            lead_name, annotations = merge_existing_annotations_with_lead(self.annotations_manager.annotations, lead)
+            lead_name, annotations = merge_existing_annotations_with_lead(
+                self.annotations_manager.annotations, lead
+            )
             updated_annotations[lead_name] = annotations
 
         self.annotations_manager.annotations = updated_annotations
@@ -297,7 +303,7 @@ class FilterSettingsWindow(tk.Toplevel):
         on_close_callback: Callable,
         # on_filter_change_callback: Callable,
         *args,
-        **kwargs
+        **kwargs,
     ):
         tk.Toplevel.__init__(self, parent, *args, **kwargs)
 
@@ -311,19 +317,25 @@ class FilterSettingsWindow(tk.Toplevel):
 
         tk.Label(self, text="Filtering method [from methods]:").pack(pady=10, padx=10)
         self.filtering_methods = FilterMethods.get_filtering_methods()
-        self.method_entry = ttk.Combobox(self, values=self.filtering_methods, state="readonly")
+        self.method_entry = ttk.Combobox(
+            self, values=self.filtering_methods, state="readonly"
+        )
         self.method_entry.set(self.filter_manager.filter_config.filter_method.value)
         self.method_entry.pack(pady=10, padx=10)
         self.method_entry.bind("<<ComboboxSelected>>", self.on_dropdown_change)
 
         tk.Label(self, text="Lowcut frequency [Hz]:").pack(pady=10, padx=10)
         self.lowcut_entry = tk.Entry(self)
-        self.lowcut_entry.insert(0, str(self.filter_manager.filter_config.lowcut_frequency))
+        self.lowcut_entry.insert(
+            0, str(self.filter_manager.filter_config.lowcut_frequency)
+        )
         self.lowcut_entry.pack(pady=10, padx=10)
 
         tk.Label(self, text="Highcut frequency [Hz]:").pack(pady=10, padx=10)
         self.highcut_entry = tk.Entry(self)
-        self.highcut_entry.insert(0, str(self.filter_manager.filter_config.highcut_frequency))
+        self.highcut_entry.insert(
+            0, str(self.filter_manager.filter_config.highcut_frequency)
+        )
         self.highcut_entry.pack(pady=10, padx=10)
 
         tk.Label(self, text="Filter order [number]:").pack(pady=10, padx=10)
@@ -345,7 +357,6 @@ class FilterSettingsWindow(tk.Toplevel):
             self.lowcut_entry.configure(state=tk.NORMAL)
 
     def save_settings(self):
-
         try:
             filter_order = int(self.order_entry.get())
         except ValueError:
@@ -355,7 +366,9 @@ class FilterSettingsWindow(tk.Toplevel):
         try:
             highcut_frequency = float(self.highcut_entry.get())
         except ValueError:
-            tk.messagebox.showerror("Error", "Lowcut frequency must be a dot separated number, e.g. 1.23")
+            tk.messagebox.showerror(
+                "Error", "Lowcut frequency must be a dot separated number, e.g. 1.23"
+            )
             return
 
         lowcut_frequency = None
@@ -363,19 +376,25 @@ class FilterSettingsWindow(tk.Toplevel):
             try:
                 lowcut_frequency = float(self.lowcut_entry.get())
             except ValueError:
-                tk.messagebox.showerror("Error", "Lowcut frequency must be a dot separated number, e.g. 1.23")
+                tk.messagebox.showerror(
+                    "Error",
+                    "Lowcut frequency must be a dot separated number, e.g. 1.23",
+                )
                 return
 
         filter_method = FilterMethods(self.method_entry.get())
         if filter_method == FilterMethods.BANDPASS and lowcut_frequency == 0.0:
-            tk.messagebox.showerror("Error", "When filter method is \"bandpass\" lowcut frequency must be non-zero number")
+            tk.messagebox.showerror(
+                "Error",
+                'When filter method is "bandpass" lowcut frequency must be non-zero number',
+            )
             return
 
         filter_config = FilterConfig(
             filter_method=filter_method,
             filter_order=filter_order,
             highcut_frequency=highcut_frequency,
-            lowcut_frequency=lowcut_frequency
+            lowcut_frequency=lowcut_frequency,
         )
 
         logging.info(f"Filter config {filter_config}")
@@ -386,7 +405,9 @@ class FilterSettingsWindow(tk.Toplevel):
             self.filter_manager.filter_config = filter_config
             if self.app_variables.explorer is not None:
                 # this line makes me thinking that the explorer should subscribe too 🤔
-                self.app_variables.explorer.filter_config = self.filter_manager.filter_config
+                self.app_variables.explorer.filter_config = (
+                    self.filter_manager.filter_config
+                )
                 self.app_variables.explorer.process()
                 self.container_manger.container = self.app_variables.explorer.container
         else:
@@ -400,4 +421,3 @@ class FilterSettingsWindow(tk.Toplevel):
     def on_close(self):
         self.destroy()
         self.on_close_callback()
-

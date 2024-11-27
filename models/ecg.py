@@ -51,15 +51,23 @@ class ECGLead:
 
 
 class ECGContainer:
-
-    EXPECTED_LEADS_ORDER = ["I", "II", "III", "aVR", "aVL", "aVF", "V1", "V2", "V3", "V4", "V5", "V6"]
+    EXPECTED_LEADS_ORDER = [
+        "I",
+        "II",
+        "III",
+        "aVR",
+        "aVL",
+        "aVF",
+        "V1",
+        "V2",
+        "V3",
+        "V4",
+        "V5",
+        "V6",
+    ]
 
     def __init__(
-        self,
-        ecg_leads: list[ECGLead],
-        raw: Any,
-        description: str,
-        file_path: str
+        self, ecg_leads: list[ECGLead], raw: Any, description: str, file_path: str
     ):
         self.ecg_leads: list[ECGLead] = self._sort_leads(ecg_leads)
         self.raw: Any = raw
@@ -71,7 +79,12 @@ class ECGContainer:
         return len(self.ecg_leads)
 
     def _sort_leads(self, ecg_leads: list[ECGLead]) -> list[ECGLead]:
-        return [lead for x in self.EXPECTED_LEADS_ORDER for lead in ecg_leads if lead.label == x]
+        return [
+            lead
+            for x in self.EXPECTED_LEADS_ORDER
+            for lead in ecg_leads
+            if lead.label == x
+        ]
 
     def get_lead(self, lead_name: LeadName) -> Optional[ECGLead]:
         leads = [lead for lead in self.ecg_leads if lead.label == lead_name]
@@ -100,8 +113,8 @@ class ECGContainer:
             if "ChannelSensitivity" in channel:  # Type 1C, may be absent
                 units = channel.ChannelSensitivityUnitsSequence[0].CodeMeaning
 
-            if units == 'microvolt':
-                units = 'uV'
+            if units == "microvolt":
+                units = "uV"
 
             leads.append(
                 ECGLead(
@@ -118,47 +131,61 @@ class ECGContainer:
 
     @classmethod
     def from_ge_xml_file(cls, path):
-
         def extract_leads(file_dict: dict) -> list[ECGLead]:
+            ecg_dict = file_dict["sapphire"]["xmlData"]["block"]["params"]["ecg"][
+                "wav"
+            ]["ecgWaveformMXG"]
 
-            ecg_dict = file_dict['sapphire']['xmlData']['block']['params']['ecg']['wav']['ecgWaveformMXG']
-
-            sample_rate_unit = ecg_dict['sampleRate']['U']
-            sample_rate = int(ecg_dict['sampleRate']['V'])
+            sample_rate_unit = ecg_dict["sampleRate"]["U"]
+            sample_rate = int(ecg_dict["sampleRate"]["V"])
             if sample_rate_unit == "Hz":
                 sample_rate_hz = sample_rate
             elif sample_rate_unit == "kHz":
                 sample_rate_hz = sample_rate / 1000
             else:
-                raise RuntimeError("GE XML - could not parse sample rate. Unit not known")
+                raise RuntimeError(
+                    "GE XML - could not parse sample rate. Unit not known"
+                )
 
-            leads_object = ecg_dict['ecgWaveform']
-            leads_from_file = [leads_object] if type(leads_object) is not list else leads_object
+            leads_object = ecg_dict["ecgWaveform"]
+            leads_from_file = (
+                [leads_object] if type(leads_object) is not list else leads_object
+            )
 
             leads = list()
             for lead in leads_from_file:
-                label = lead['lead']
-                units = lead['U']
+                label = lead["lead"]
+                units = lead["U"]
                 # asizeBT = lead['asizeBT']
                 # inv = lead['INV']
-                magic_number = lead['S']
-                waveform_str: str = lead['V']
-                waveform_data = np.fromiter(map(lambda x: float(x), waveform_str.split(" ")), dtype=np.float_) * float(magic_number)
+                magic_number = lead["S"]
+                waveform_str: str = lead["V"]
+                waveform_data = np.fromiter(
+                    map(lambda x: float(x), waveform_str.split(" ")), dtype=np.float_
+                ) * float(magic_number)
 
-                leads.append(
-                    ECGLead(
-                        label, waveform_data, None, units, sample_rate_hz
-                    )
-                )
+                leads.append(ECGLead(label, waveform_data, None, units, sample_rate_hz))
 
             return leads
 
         def extract_description(file_dict: dict) -> str:
+            given_names_list = (
+                file_dict["sapphire"]["demographics"]["patientInfo"]
+                .get("name", {})
+                .get("given", [])
+            )
+            given_names = [
+                x.get("V", "")
+                for x in given_names_list
+                if x.get("V") is not None and x["V"] != "NONE"
+            ]
 
-            given_names_list = file_dict['sapphire']['demographics']['patientInfo'].get('name', {}).get('given', [])
-            given_names = [x.get('V', '') for x in given_names_list if x.get('V') is not None and x['V'] != "NONE"]
-
-            family_name = file_dict['sapphire']['demographics']['patientInfo'].get('name', {}).get('family', {}).get('V', '')
+            family_name = (
+                file_dict["sapphire"]["demographics"]["patientInfo"]
+                .get("name", {})
+                .get("family", {})
+                .get("V", "")
+            )
 
             return " ".join(given_names) + " " + family_name
 
@@ -173,12 +200,7 @@ class ECGContainer:
         else:
             logging.info(f"Loaded file successfully {path}")
 
-        return cls(
-            leads,
-            root,
-            description,
-            path
-        )
+        return cls(leads, root, description, path)
 
     def save_annotations(self, filename):
         annotations = {lead.label: lead.ann for lead in self.ecg_leads}
@@ -209,7 +231,6 @@ class ECGContainer:
 
 
 def etree_to_dict(t):
-
     def clean_up_tag(tag):
         if "}" in tag:
             return tag.split("}")[1]
@@ -223,15 +244,14 @@ def etree_to_dict(t):
         for dc in map(etree_to_dict, children):
             for k, v in dc.items():
                 dd[k].append(v)
-        d = {tag: {k:v[0] if len(v) == 1 else v for k, v in dd.items()}}
+        d = {tag: {k: v[0] if len(v) == 1 else v for k, v in dd.items()}}
     if t.attrib:
         d[tag].update((k, v) for k, v in t.attrib.items())
     if t.text:
         text = t.text.strip()
         if children or t.attrib:
             if text:
-              d[tag]['#text'] = text
+                d[tag]["#text"] = text
         else:
             d[tag] = text
     return d
-

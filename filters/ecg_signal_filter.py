@@ -25,11 +25,19 @@ class FilterConfig:
     filter_order: int = 1.0
 
     def __post_init__(self):
-        if self.filter_method == FilterMethods.LOWPASS and self.highcut_frequency is None:
-            raise FilterInitError("Lowpass filter requires high cut frequency to be set ")
-        if (self.filter_method == FilterMethods.BANDPASS
-                and (self.lowcut_frequency is None or self.highcut_frequency is None)):
-            raise FilterInitError("Bandpass filter requires both - low and high cut frequencies to be set ")
+        if (
+            self.filter_method == FilterMethods.LOWPASS
+            and self.highcut_frequency is None
+        ):
+            raise FilterInitError(
+                "Lowpass filter requires high cut frequency to be set "
+            )
+        if self.filter_method == FilterMethods.BANDPASS and (
+            self.lowcut_frequency is None or self.highcut_frequency is None
+        ):
+            raise FilterInitError(
+                "Bandpass filter requires both - low and high cut frequencies to be set "
+            )
 
     @classmethod
     def default_bandpass(cls):
@@ -37,24 +45,18 @@ class FilterConfig:
             lowcut_frequency=2.0,
             highcut_frequency=15.0,
             filter_order=1,
-            filter_method=FilterMethods.BANDPASS
+            filter_method=FilterMethods.BANDPASS,
         )
 
     @classmethod
     def default_lowpass(cls):
         return cls(
-            highcut_frequency=15.0,
-            filter_order=1,
-            filter_method=FilterMethods.LOWPASS
+            highcut_frequency=15.0, filter_order=1, filter_method=FilterMethods.LOWPASS
         )
 
 
 class EcgSignalFilter:
-
-    def __init__(
-        self,
-        config: FilterConfig
-    ):
+    def __init__(self, config: FilterConfig):
         if config is None:
             raise RuntimeError("Cannot initialize filter with empty config")
 
@@ -76,10 +78,17 @@ class EcgSignalFilter:
         return filtered
 
     def _get_filter_params(self, fs: float) -> tuple[float, float]:
-
         nyq = 0.5 * fs
-        lowcut = self.filter_config.lowcut_frequency / nyq if self.filter_config.lowcut_frequency else None
-        highcut = self.filter_config.highcut_frequency / nyq if self.filter_config.highcut_frequency else None
+        lowcut = (
+            self.filter_config.lowcut_frequency / nyq
+            if self.filter_config.lowcut_frequency
+            else None
+        )
+        highcut = (
+            self.filter_config.highcut_frequency / nyq
+            if self.filter_config.highcut_frequency
+            else None
+        )
         filter_order = self.filter_config.filter_order
 
         if self.filter_config.filter_method == FilterMethods.BANDPASS:
@@ -88,7 +97,9 @@ class EcgSignalFilter:
         if self.filter_config.filter_method == FilterMethods.LOWPASS:
             return signal.butter(filter_order, [highcut], btype="lowpass")
 
-        raise RuntimeError(f"Filter method  {self.filter_config.filter_method} not known")
+        raise RuntimeError(
+            f"Filter method  {self.filter_config.filter_method} not known"
+        )
 
 
 class FilterInitError(Exception):

@@ -11,14 +11,14 @@ from frontend.observers.annotations_manager import AnnotationsManager
 # TODO: this
 class BottomFrame(tk.Frame):
     def __init__(
-            self,
-            parent: tk.Frame,
-            annotations_manager: AnnotationsManager,
-            app_variables: AppVariables,
-            # we need access to "master" parent to close it, this is why want this as a callback
-            close_app_callback: Callable,
-            *args,
-            **kwargs
+        self,
+        parent: tk.Frame,
+        annotations_manager: AnnotationsManager,
+        app_variables: AppVariables,
+        # we need access to "master" parent to close it, this is why want this as a callback
+        close_app_callback: Callable,
+        *args,
+        **kwargs,
     ):
         tk.Frame.__init__(self, parent, *args, **kwargs)
 
@@ -60,7 +60,9 @@ class BottomFrame(tk.Frame):
 
         df = self.app_variables.explorer.generate_report()
         filename = fd.asksaveasfile(
-            mode="w", initialfile=f"{self.app_variables.file_name}.csv", defaultextension=".csv"
+            mode="w",
+            initialfile=f"{self.app_variables.file_name}.csv",
+            defaultextension=".csv",
         )
         if filename is None:
             return

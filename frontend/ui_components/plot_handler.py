@@ -26,7 +26,6 @@ from models.ecg import LeadName, ECGLead
 
 
 class ECGPlotHandler(tk.Frame, Observer):
-
     X_ECG_GRID_IN_MS = 200
     ECG_PLOT_PACK_CONFIG = {"fill": tk.BOTH, "side": tk.TOP, "expand": True}
 
@@ -38,7 +37,7 @@ class ECGPlotHandler(tk.Frame, Observer):
         container_manager: ContainerManager,
         filter_manager: FilterManager,
         *args,
-        **kwargs
+        **kwargs,
     ):
         tk.Frame.__init__(self, parent, *args, **kwargs)
 
@@ -72,17 +71,23 @@ class ECGPlotHandler(tk.Frame, Observer):
         self.canvas.mpl_connect("key_press_event", self._handle_key_press_event)
 
     @classmethod
-    def empty(cls,
-              parent: tk.Frame,
-              leads_manager: LeadsManager,
-              annotations_manager: AnnotationsManager,
-              container_manager: ContainerManager,
-              filter_manager: FilterManager,
-      ):
-        return ECGPlotHandler(parent, leads_manager, annotations_manager, container_manager, filter_manager)
+    def empty(
+        cls,
+        parent: tk.Frame,
+        leads_manager: LeadsManager,
+        annotations_manager: AnnotationsManager,
+        container_manager: ContainerManager,
+        filter_manager: FilterManager,
+    ):
+        return ECGPlotHandler(
+            parent,
+            leads_manager,
+            annotations_manager,
+            container_manager,
+            filter_manager,
+        )
 
     def update_on_notification(self, event: Enum, *args, **kwargs):
-
         logging.info(f"Received {event.name} event in ECGPlotHandler")
 
         if event == ContainerEvents.CONTAINER_UPDATE:
@@ -107,7 +112,6 @@ class ECGPlotHandler(tk.Frame, Observer):
             self.draw_annotations_for_selected_leads()
 
     def plot_waveforms_for_selected_leads(self):
-
         leads = self.leads_manager.selected_leads
         show_processed_signal = self.filter_manager.show_filtered
 
@@ -223,11 +227,11 @@ class ECGPlotHandler(tk.Frame, Observer):
         self.ax_properties = axes
 
     def _plot_waveform(
-            self,
-            lead: ECGLead,
-            ax: plt.Axes,
-            line: plt.Line2D,
-            show_processed_signal: bool = False,
+        self,
+        lead: ECGLead,
+        ax: plt.Axes,
+        line: plt.Line2D,
+        show_processed_signal: bool = False,
     ):
         waveform = lead.waveform if show_processed_signal else lead.raw_waveform
 

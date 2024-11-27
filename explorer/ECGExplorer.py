@@ -16,17 +16,16 @@ class ECGExplorer:
         container: ECGContainer,
         filter_config: Optional[FilterConfig] = None,
     ):
-
         self._container = container
         self._filter_config = filter_config
-        self._filter: Optional[EcgSignalFilter] = EcgSignalFilter(filter_config) if filter_config else None
+        self._filter: Optional[EcgSignalFilter] = (
+            EcgSignalFilter(filter_config) if filter_config else None
+        )
         self._r_detector = PanTompkinsDetector()
 
     @classmethod
     def load_from_file(
-        cls,
-        filepath: str,
-        filter_config: Optional[FilterConfig] = None
+        cls, filepath: str, filter_config: Optional[FilterConfig] = None
     ):
         if not os.path.isfile(filepath):
             raise FileNotFoundError()
@@ -67,7 +66,9 @@ class ECGExplorer:
                 out[cnt] = l
             return out
 
-        def _safe_statistics(data: list[Optional[float]], statistic: Callable) -> Optional[float]:
+        def _safe_statistics(
+            data: list[Optional[float]], statistic: Callable
+        ) -> Optional[float]:
             if len(data) > 0 and any([x is not None for x in data]):
                 d = [x for x in data if x is not None]
                 return float(f"{(statistic(d)):.2f}")
@@ -85,12 +86,27 @@ class ECGExplorer:
 
             qrs_lengths = _padded(lead.calculate_qrs_lengths(), max_size)
             # None to add one empty line before mean value
-            qrs_lengths.extend([None, _safe_statistics(qrs_lengths, statistics.mean), _safe_statistics(qrs_lengths, statistics.stdev)])
+            qrs_lengths.extend(
+                [
+                    None,
+                    _safe_statistics(qrs_lengths, statistics.mean),
+                    _safe_statistics(qrs_lengths, statistics.stdev),
+                ]
+            )
             qrs_areas = _padded(lead.calculate_qrs_areas(), max_size)
             # None to add one empty line before mean value
-            qrs_areas.extend([None, _safe_statistics(qrs_areas, statistics.mean), _safe_statistics(qrs_areas, statistics.stdev)])
+            qrs_areas.extend(
+                [
+                    None,
+                    _safe_statistics(qrs_areas, statistics.mean),
+                    _safe_statistics(qrs_areas, statistics.stdev),
+                ]
+            )
 
-            row_names = [f"annotation {x}" for x in range(len(_padded(lead.calculate_qrs_lengths(), max_size)))]
+            row_names = [
+                f"annotation {x}"
+                for x in range(len(_padded(lead.calculate_qrs_lengths(), max_size)))
+            ]
             row_names.extend(["", "mean", "std"])
 
             report[f"index"] = pd.Series(row_names)

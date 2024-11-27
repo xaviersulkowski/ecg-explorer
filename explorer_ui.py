@@ -47,7 +47,7 @@ class MainApplication(tk.Frame):
             container_manager=self.container_manager,
             filter_manager=self.filter_manager,
             load_signal_callback=self.load_signal_callback,
-            app_variables=self.app_variables
+            app_variables=self.app_variables,
         )
         self.top_frame.pack(fill=tk.BOTH, side=tk.TOP)
 
@@ -76,6 +76,7 @@ class MainApplication(tk.Frame):
             1. dicom
             2. XML from GE devices
         """
+
         def enable_options_on_signal_load():
             self.top_frame.activate_widgets()
             self.bottom_frame.activate_widgets()
@@ -86,8 +87,7 @@ class MainApplication(tk.Frame):
         self.app_variables.file_name = tail.split(".")[0]
 
         explorer = ECGExplorer.load_from_file(
-            filename,
-            self.filter_manager.filter_config
+            filename, self.filter_manager.filter_config
         )
         self.app_variables.explorer = explorer
 

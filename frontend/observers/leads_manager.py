@@ -29,8 +29,13 @@ class LeadsManager(Subject):
         """
         self._leads_mapping = leads_mapping
         self._selected_leads_names = [list(self._leads_mapping.keys())[0]]
-        self.notify_subscribers(event=LeadEvents.LEADS_MAPPING_UPDATE, leads_mapping=self.leads_mapping)
-        self.notify_subscribers(event=LeadEvents.LEADS_SELECTION_UPDATE, selected_names=self._selected_leads_names)
+        self.notify_subscribers(
+            event=LeadEvents.LEADS_MAPPING_UPDATE, leads_mapping=self.leads_mapping
+        )
+        self.notify_subscribers(
+            event=LeadEvents.LEADS_SELECTION_UPDATE,
+            selected_names=self._selected_leads_names,
+        )
 
     def set_mapping_from_ecg_container(self, ecg_container: ECGContainer):
         """
@@ -47,7 +52,9 @@ class LeadsManager(Subject):
     @selected_leads_names.setter
     def selected_leads_names(self, selected_leads_names: list[str]):
         self._selected_leads_names = selected_leads_names
-        self.notify_subscribers(event=LeadEvents.LEADS_SELECTION_UPDATE, leads=self._selected_leads_names)
+        self.notify_subscribers(
+            event=LeadEvents.LEADS_SELECTION_UPDATE, leads=self._selected_leads_names
+        )
 
     @property
     def selected_leads(self) -> list[ECGLead]:
