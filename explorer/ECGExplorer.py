@@ -90,7 +90,7 @@ class ECGExplorer:
             # None to add one empty line before mean value
             qrs_areas.extend([None, _safe_statistics(qrs_areas, statistics.mean), _safe_statistics(qrs_areas, statistics.stdev)])
 
-            row_names = [str(x) for x in range(len(_padded(lead.calculate_qrs_lengths(), max_size)))]
+            row_names = [f"annotation {x}" for x in range(len(_padded(lead.calculate_qrs_lengths(), max_size)))]
             row_names.extend(["", "mean", "std"])
 
             report[f"index"] = pd.Series(row_names)
