@@ -35,10 +35,10 @@ class ECGLead:
         ]
 
     def calculate_qrs_areas(self) -> list[float]:
-        if self.units == "microvolt":
+        if self.units == "uV":
             waveform = self.raw_waveform
         else:
-            RuntimeError("Unit not known")
+            raise RuntimeError(f"Unit {self.units} not known")
 
         areas = np.zeros(len(self.ann.qrs_complex_positions or []))
 
@@ -88,7 +88,7 @@ class ECGContainer:
             logging.warning(f"Couldn't read dicom file: {path}. Reason: {e}")
             raise e
         else:
-            logging.info(f"Loaded file successfully")
+            logging.info(f"Loaded file successfully {path}")
 
         waveform = raw.WaveformSequence[0]
         waveform_data = raw.waveform_array(0)
@@ -171,7 +171,7 @@ class ECGContainer:
             logging.warning(f"Couldn't read GE XLM file: {path}. Reason: {e}")
             raise e
         else:
-            logging.info(f"Loaded file successfully")
+            logging.info(f"Loaded file successfully {path}")
 
         return cls(
             leads,
@@ -200,6 +200,10 @@ class ECGContainer:
                     raise RuntimeError(
                         "File you're trying to load is not an annotation file or is malformed"
                     )
+
+                # legacy leads had "Lead" prefix.
+                if "Lead " in k:
+                    k = k.replace("Lead ", "")
 
                 self.get_lead(k).ann = v
 

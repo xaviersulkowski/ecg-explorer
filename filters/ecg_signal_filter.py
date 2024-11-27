@@ -1,3 +1,4 @@
+import logging
 from enum import Enum
 from dataclasses import dataclass
 from typing import Optional
@@ -60,6 +61,7 @@ class EcgSignalFilter:
         self.filter_config = config
 
     def filter(self, ecg: ECGContainer):
+        logging.info(f"Applying filter {self.filter_config}")
         for lead in ecg.ecg_leads:
             lead.waveform = self._do_filter(lead)
             lead.is_filtered = True

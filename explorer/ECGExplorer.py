@@ -1,5 +1,6 @@
 import os
-from typing import Optional
+import statistics
+from typing import Optional, Callable
 
 import pandas as pd
 
@@ -39,7 +40,7 @@ class ECGExplorer:
 
     def process(self):
         self._filter.filter(self._container)
-        # self._r_detector.detect(self._container)
+        self._r_detector.detect(self._container)
 
     @property
     def container(self):
@@ -66,9 +67,10 @@ class ECGExplorer:
                 out[cnt] = l
             return out
 
-        def _safe_mean(data: list[float]) -> Optional[float]:
-            if all([x is not None for x in data]):
-                return float(f"{(sum(data) / len(data)):.2f}")
+        def _safe_statistics(data: list[Optional[float]], statistic: Callable) -> Optional[float]:
+            if len(data) > 0 and any([x is not None for x in data]):
+                d = [x for x in data if x is not None]
+                return float(f"{(statistic(d)):.2f}")
             else:
                 return None
 
@@ -83,11 +85,15 @@ class ECGExplorer:
 
             qrs_lengths = _padded(lead.calculate_qrs_lengths(), max_size)
             # None to add one empty line before mean value
-            qrs_lengths.append([None, _safe_mean(qrs_lengths)])
+            qrs_lengths.extend([None, _safe_statistics(qrs_lengths, statistics.mean), _safe_statistics(qrs_lengths, statistics.stdev)])
             qrs_areas = _padded(lead.calculate_qrs_areas(), max_size)
             # None to add one empty line before mean value
-            qrs_areas.append([None, _safe_mean(qrs_areas)])
+            qrs_areas.extend([None, _safe_statistics(qrs_areas, statistics.mean), _safe_statistics(qrs_areas, statistics.stdev)])
 
+            row_names = [str(x) for x in range(len(_padded(lead.calculate_qrs_lengths(), max_size)))]
+            row_names.extend(["", "mean", "std"])
+
+            report[f"index"] = pd.Series(row_names)
             report[f"{column_root}_width_ms"] = pd.Series(qrs_lengths)
             report[f"{column_root}_area_uV.s"] = pd.Series(qrs_areas)
 
