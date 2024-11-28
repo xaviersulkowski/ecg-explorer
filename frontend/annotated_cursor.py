@@ -54,8 +54,16 @@ class AnnotatedCursor(Cursor):
 
     """
 
-    def __init__(self, line, numberformat="{0:.4g};{1:.4g}", offset=(5, 5),
-                 dataaxis='x', textprops=None, fs=1, **cursorargs):
+    def __init__(
+        self,
+        line,
+        numberformat="{0:.4g};{1:.4g}",
+        offset=(5, 5),
+        dataaxis="x",
+        textprops=None,
+        fs=1,
+        **cursorargs,
+    ):
         if textprops is None:
             textprops = {}
         # The line object, for which the coordinates are displayed
@@ -80,7 +88,9 @@ class AnnotatedCursor(Cursor):
             self.ax.get_ybound()[0],
             "0, 0",
             animated=bool(self.useblit),
-            visible=False, **textprops)
+            visible=False,
+            **textprops,
+        )
         # The position at which the cursor was last drawn
         self.lastdrawnplotpoint = None
         self.fs = fs
@@ -213,17 +223,18 @@ class AnnotatedCursor(Cursor):
 
         # The dataaxis attribute decides, in which axis we look up which cursor
         # coordinate.
-        if self.dataaxis == 'x':
+        if self.dataaxis == "x":
             pos = xpos
             data = xdata
             lim = self.ax.get_xlim()
-        elif self.dataaxis == 'y':
+        elif self.dataaxis == "y":
             pos = ypos
             data = ydata
             lim = self.ax.get_ylim()
         else:
-            raise ValueError(f"The data axis specifier {self.dataaxis} should "
-                             f"be 'x' or 'y'")
+            raise ValueError(
+                f"The data axis specifier {self.dataaxis} should " f"be 'x' or 'y'"
+            )
 
         # If position is valid and in valid plot data range.
         if pos is not None and lim[0] <= pos <= lim[-1]:

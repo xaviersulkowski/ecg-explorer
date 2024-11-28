@@ -129,12 +129,13 @@ class ECGPlotHandler(tk.Frame, Observer):
                 line=ax_props.line,
                 ax=ax_props.ax,
                 numberformat="{0:.2f}\n{1:.2f}",
-                dataaxis='x', offset=[10, 10],
-                textprops={'color': 'black', 'fontweight': 'normal'},
+                dataaxis="x",
+                offset=[10, 10],
+                textprops={"color": "black", "fontweight": "normal"},
                 useblit=False,
                 color="grey",
                 linewidth=1,
-                fs=lead.fs
+                fs=lead.fs,
             )
             self.cursors[lead.label] = cursor
 
