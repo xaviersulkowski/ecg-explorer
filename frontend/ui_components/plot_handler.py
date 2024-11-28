@@ -12,8 +12,9 @@ from matplotlib.backend_bases import MouseEvent, KeyEvent
 from matplotlib.backends._backend_tk import NavigationToolbar2Tk
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.ticker import AutoMinorLocator, MultipleLocator
-from matplotlib.widgets import SpanSelector
+from matplotlib.widgets import SpanSelector, Cursor
 
+from frontend.annotated_cursor import AnnotatedCursor
 from frontend.constants import APP_TITTLE
 from frontend.observers.annotations_manager import AnnotationsManager, AnnotationEvents
 from frontend.observers.container_manager import ContainerManager, ContainerEvents
@@ -63,6 +64,8 @@ class ECGPlotHandler(tk.Frame, Observer):
 
         # ====== app variables ======
         self.ax_properties: Optional[dict[LeadName, AxProperties]] = None
+
+        self.cursors: dict[str, Cursor] = {}
 
         # mouse event that helps to handle actions when a span is selected
         self.mouse_event: Optional[MouseEvent] = None
@@ -117,9 +120,23 @@ class ECGPlotHandler(tk.Frame, Observer):
 
         self._create_subplots(leads)
 
+        self.cursors.clear()
         for lead_name, ax_props in self.ax_properties.items():
             lead = self.leads_manager.get_lead(lead_name)
             self._plot_waveform(lead, ax_props.ax, ax_props.line, show_processed_signal)
+
+            cursor = AnnotatedCursor(
+                line=ax_props.line,
+                ax=ax_props.ax,
+                numberformat="{0:.2f}\n{1:.2f}",
+                dataaxis='x', offset=[10, 10],
+                textprops={'color': 'black', 'fontweight': 'normal'},
+                useblit=False,
+                color="grey",
+                linewidth=1,
+                fs=lead.fs
+            )
+            self.cursors[lead.label] = cursor
 
         self.canvas.draw()
         self.canvas.get_tk_widget().pack(**self.ECG_PLOT_PACK_CONFIG)

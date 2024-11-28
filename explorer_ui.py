@@ -12,7 +12,6 @@ from frontend.constants import APP_TITTLE
 from frontend.observers.container_manager import ContainerManager
 from frontend.observers.filter_config_manager import FilterManager
 from frontend.observers.leads_manager import LeadsManager
-from frontend.observers.observer_abc import Observer
 from frontend.ui_components.bottom_frame import BottomFrame
 from frontend.ui_components.plot_handler import ECGPlotHandler
 from frontend.ui_components.top_frame import TopFrame
