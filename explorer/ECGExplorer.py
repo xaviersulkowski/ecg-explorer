@@ -37,9 +37,10 @@ class ECGExplorer:
         if ext.lower() == ".xml":
             return cls(ECGContainer.from_ge_xml_file(filepath), filter_config)
 
-    def process(self):
+    def process(self, peaks_detection: bool = False):
         self._filter.filter(self._container)
-        self._r_detector.detect(self._container)
+        if peaks_detection:
+            self._r_detector.detect(self._container)
 
     @property
     def container(self):

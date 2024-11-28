@@ -18,7 +18,7 @@ from frontend.ui_components.top_frame import TopFrame
 
 matplotlib.use("Agg")
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.WARN)
 
 
 class MainApplication(tk.Frame):

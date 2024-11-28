@@ -203,7 +203,7 @@ class ActionButtonsFrame(tk.Frame):
     def _process_signal_callback(self):
         logging.info("Processing signal")
 
-        self.app_variables.explorer.process()
+        self.app_variables.explorer.process(True)
 
         updated_annotations = {}
         for lead in self.container_manager.container.ecg_leads:
