@@ -93,6 +93,36 @@ class ECGContainer:
         else:
             return None
 
+    @staticmethod
+    def normalize_lead_name(lead: LeadName) -> LeadName:
+        match lead.upper():
+            case "I":
+                return "I"
+            case "II":
+                return "II"
+            case "III":
+                return "III"
+            case "AVR":
+                return "aVR"
+            case "AVL":
+                return "aVL"
+            case "AVF":
+                return "aVF"
+            case "V1":
+                return "V1"
+            case "V2":
+                return "V2"
+            case "V3":
+                return "V3"
+            case "V4":
+                return "V4"
+            case "V5":
+                return "V5"
+            case "V6":
+                return "V6"
+            case _:
+                raise AttributeError(f"Lead name {lead} not known!")
+
     @classmethod
     def from_dicom_file(cls, path: str):
         try:
@@ -108,7 +138,7 @@ class ECGContainer:
         leads = list()
 
         for ii, channel in enumerate(waveform.ChannelDefinitionSequence):
-            label = channel.ChannelLabel.replace("Lead ", "")
+            label = cls.normalize_lead_name(channel.ChannelLabel.replace("Lead ", ""))
             units = None
             if "ChannelSensitivity" in channel:  # Type 1C, may be absent
                 units = channel.ChannelSensitivityUnitsSequence[0].CodeMeaning
@@ -154,10 +184,8 @@ class ECGContainer:
 
             leads = list()
             for lead in leads_from_file:
-                label = lead["lead"]
+                label = cls.normalize_lead_name(lead["lead"])
                 units = lead["U"]
-                # asizeBT = lead['asizeBT']
-                # inv = lead['INV']
                 magic_number = lead["S"]
                 waveform_str: str = lead["V"]
                 waveform_data = np.fromiter(
