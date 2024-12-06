@@ -91,7 +91,7 @@ class ECGExplorer:
                 [
                     None,
                     _safe_statistics(qrs_lengths, statistics.mean),
-                    _safe_statistics(qrs_lengths, statistics.stdev),
+                    _safe_statistics(qrs_lengths, lambda x: statistics.stdev if (len(x) > 1) else 0.0),
                 ]
             )
             qrs_areas = _padded(lead.calculate_qrs_areas(), max_size)
@@ -100,7 +100,7 @@ class ECGExplorer:
                 [
                     None,
                     _safe_statistics(qrs_areas, statistics.mean),
-                    _safe_statistics(qrs_areas, statistics.stdev),
+                    _safe_statistics(qrs_areas, lambda x: statistics.stdev if (len(x) > 1) else 0.0),
                 ]
             )
 

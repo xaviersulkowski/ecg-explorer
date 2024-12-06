@@ -1,6 +1,6 @@
 from enum import Enum
 
-from frontend.models import Span
+
 from frontend.observers.observer_abc import Subject
 from models.annotation import QRSComplex
 from models.ecg import LeadName, ECGContainer
@@ -18,10 +18,10 @@ class AnnotationsManager(Subject):
 
     def __init__(self):
         super().__init__()
-        self._annotations_per_lead: dict[LeadName, list[Span]] = {}
+        self._annotations_per_lead: dict[LeadName, list[QRSComplex]] = {}
 
     @property
-    def annotations(self):
+    def annotations(self) -> dict[LeadName, list[QRSComplex]]:
         return self._annotations_per_lead
 
     @annotations.setter
@@ -39,9 +39,3 @@ class AnnotationsManager(Subject):
 
     def empty_from_ecg_container(self, ecg_container: ECGContainer):
         self._annotations_per_lead = {x.label: [] for x in ecg_container.ecg_leads}
-
-    def to_qrs_complexes(self) -> dict[LeadName, list[QRSComplex]]:
-        out = {}
-        for lead, annotations in self.annotations.items():
-            out[lead] = [QRSComplex(a.onset, a.offset) for a in annotations]
-        return out

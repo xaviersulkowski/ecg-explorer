@@ -20,9 +20,12 @@ from frontend.observers.annotations_manager import AnnotationsManager, Annotatio
 from frontend.observers.container_manager import ContainerManager, ContainerEvents
 from frontend.observers.filter_config_manager import FilterManager, FilterEvents
 from frontend.observers.leads_manager import LeadsManager, LeadEvents
-from frontend.models import AxProperties, Span
+from frontend.models import AxProperties
 from frontend.observers.observer_abc import Observer
-from frontend.utils import do_spans_overlap
+from frontend.span.span import Span
+from frontend.span.spans_manager import SpanManager
+from frontend.utils import do_annotations_overlap
+from models.annotation import QRSComplex
 from models.ecg import LeadName, ECGLead
 
 
@@ -63,8 +66,8 @@ class ECGPlotHandler(tk.Frame, Observer):
         self.filter_manager.add_subscriber(self)
 
         # ====== app variables ======
-        self.ax_properties: Optional[dict[LeadName, AxProperties]] = None
-
+        self.ax_properties: dict[LeadName, AxProperties] = {}
+        self.span_managers: dict[LeadName, SpanManager] = {}
         self.cursors: dict[str, Cursor] = {}
 
         # mouse event that helps to handle actions when a span is selected
@@ -82,6 +85,9 @@ class ECGPlotHandler(tk.Frame, Observer):
         container_manager: ContainerManager,
         filter_manager: FilterManager,
     ):
+        """
+        Factory method to create an empty ECGPlotHandler instance.
+        """
         return ECGPlotHandler(
             parent,
             leads_manager,
@@ -94,25 +100,46 @@ class ECGPlotHandler(tk.Frame, Observer):
         logging.info(f"Received {event.name} event in ECGPlotHandler")
 
         if event == ContainerEvents.CONTAINER_UPDATE:
-            self.plot_waveforms_for_selected_leads()
-            self.draw_annotations_for_selected_leads()
+            self._update_plot()
 
         if event == FilterEvents.DISPLAY_CONFIG_UPDATE:
-            self.plot_waveforms_for_selected_leads()
-            self.draw_annotations_for_selected_leads()
+            self._update_plot()
 
         if event == AnnotationEvents.ANNOTATIONS_UPDATE:
             # remove existing span artists and draw new ones
-            self.clear_annotations()
-            self.draw_annotations_for_selected_leads()
+            self._update_plot()
 
         if event == AnnotationEvents.ANNOTATIONS_DELETE:
             # just re-draw waveform
-            self.plot_waveforms_for_selected_leads()
+            self._clear_all_spans()
 
         if event == LeadEvents.LEADS_SELECTION_UPDATE:
-            self.plot_waveforms_for_selected_leads()
-            self.draw_annotations_for_selected_leads()
+            self._update_plot()
+
+    def _update_plot(self):
+        """
+       Recreate subplots for selected leads and synchronize spans with annotations.
+       """
+        self.plot_waveforms_for_selected_leads()
+        self.synchronize_spans_with_annotations()
+        self.canvas.draw_idle()
+
+    def _clear_all_spans(self):
+        """
+        Clear all spans from the plot and reset annotations.
+        """
+        logging.info("Clearing existing annotations before re-drawing")
+        for manager in self.span_managers.values():
+            manager.clear_spans()
+        self.canvas.draw_idle()
+
+    def synchronize_spans_with_annotations(self):
+        """
+        Synchronize the spans on the plot with the data in AnnotationsManager.
+        """
+        for lead, annotations in self.annotations_manager.annotations.items():
+            if lead in self.span_managers:
+                self.span_managers[lead].synchronize_with_data(annotations)
 
     def plot_waveforms_for_selected_leads(self):
         leads = self.leads_manager.selected_leads
@@ -128,7 +155,7 @@ class ECGPlotHandler(tk.Frame, Observer):
             cursor = AnnotatedCursor(
                 line=ax_props.line,
                 ax=ax_props.ax,
-                numberformat="{0:.2f}\n{1:.2f}",
+                numberformat="{0:.2f}[s]\n{1:.2f}[mV]",
                 dataaxis="x",
                 offset=[10, 10],
                 textprops={"color": "black", "fontweight": "normal"},
@@ -139,17 +166,10 @@ class ECGPlotHandler(tk.Frame, Observer):
             )
             self.cursors[lead.label] = cursor
 
-        self.canvas.draw()
+            self.span_managers[lead.label] = SpanManager(ax_props.ax)
+
+        self.canvas.draw_idle()
         self.canvas.get_tk_widget().pack(**self.ECG_PLOT_PACK_CONFIG)
-
-    def draw_annotations_for_selected_leads(self):
-        for lead in self.leads_manager.selected_leads:
-            if self.annotations_manager.annotations.get(lead.label) is not None:
-                for span in self.annotations_manager.annotations[lead.label]:
-                    ax_props = self.ax_properties[lead.label]
-                    span.create_artist(ax_props.ax)
-
-        self.canvas.draw()
 
     def _on_select_with_axes(self, ax: plt.Axes):
         def on_select(*positions: (float, float)):
@@ -159,21 +179,11 @@ class ECGPlotHandler(tk.Frame, Observer):
 
         return on_select
 
-    def clear_annotations(self):
-        logging.info("Clearing existing annotations before re-drawing")
-        if not len(self.annotations_manager.annotations) > 0:
-            return
-
-        for spans in self.annotations_manager.annotations.values():
-            for span in spans:
-                span.remove_artist()
-
-        self.canvas.draw()
-
     def _set_selected_span(
         self, lead_name: str, ax: plt.Axes, onset: float, offset: float
     ):
         if onset == offset:
+            logging.info("Onset == offset. Span not selected")
             return
 
         onset, offset = min(onset, offset), max(onset, offset)
@@ -186,7 +196,7 @@ class ECGPlotHandler(tk.Frame, Observer):
         # find overlapping QRS with selected span
         overlapping = [
             True
-            if do_spans_overlap(onset, offset, x.onset, x.offset) is True
+            if do_annotations_overlap(onset, offset, x.onset, x.offset) is True
             else False
             for x in self.annotations_manager.annotations[lead.label]
         ]
@@ -198,32 +208,35 @@ class ECGPlotHandler(tk.Frame, Observer):
             )
             return
 
+        qrs_complex = QRSComplex(onset, offset)
+
         if any(overlapping):
             # if span overlaps then we need to remove the span and associated Polygon
-            self.annotations_manager.annotations[lead.label].pop(
-                overlapping.index(True)
-            ).remove_artist()
+            self.annotations_manager.annotations[lead.label][overlapping.index(True)] = qrs_complex
+            self.span_managers[lead.label].spans[overlapping.index(True)].update(onset, offset)
+        else:
+            span = Span(onset, offset, ax)
+            self.annotations_manager.annotations[lead.label].append(qrs_complex)
+            self.span_managers[lead.label].spans.append(span)
 
-        span = Span(onset, offset)
-        span.create_artist(ax)
-
-        self.annotations_manager.annotations[lead.label].append(span)
-        self.canvas.draw()
+        self.canvas.draw_idle()
 
     def _create_subplots(self, leads: list[ECGLead]):
         self.fig.clear()
+        self.ax_properties.clear()
+        self.span_managers.clear()
 
         n_subplots = len(leads) if leads else 1
         n_columns = 2 if n_subplots > 3 else 1
         n_rows = math.ceil(n_subplots / n_columns)
 
-        axes: dict[LeadName, AxProperties] = {}
+        # axes: dict[LeadName, AxProperties] = {}
 
         for i, lead in enumerate(leads):
             ax = self.fig.add_subplot(n_rows, n_columns, i + 1)
 
             if i > 0:
-                ax.sharex(list(axes.values())[0].ax)
+                ax.sharex(list(self.ax_properties.values())[0].ax)
 
             (line,) = ax.plot([], [])
 
@@ -237,12 +250,10 @@ class ECGPlotHandler(tk.Frame, Observer):
                 minspan=10,
             )
 
-            axes[lead.label] = AxProperties(ax, line, span_selector)
+            self.ax_properties[lead.label] = AxProperties(ax, line, span_selector)
 
         # need to set tight layout after each fig redrawing
         self.fig.tight_layout()
-
-        self.ax_properties = axes
 
     def _plot_waveform(
         self,
@@ -296,23 +307,39 @@ class ECGPlotHandler(tk.Frame, Observer):
         ax.label_outer()
 
     def _select_and_highlight_span(self, event: tk.Event):
+        """
+        Handle double-click events to highlight or unhighlight spans.
+
+        Parameters
+        ----------
+        event : MouseEvent
+            The mouse event triggering the action.
+        """
         if not isinstance(event, MouseEvent):
             return
 
-        if event.dblclick:
-            self.mouse_event = event
-            selected_lead = self.mouse_event.inaxes.axes.get_title()
+        logging.info(f"Mouse event started, is dbclick {event.dblclick}, is inaxes {event.inaxes}")
 
-            for span in self.annotations_manager.annotations[selected_lead]:
-                if span.onset <= self.mouse_event.xdata <= span.offset:
-                    if span.is_highlighted:
-                        span.remove_highlight()
-                        self.mouse_event = None
-                    else:
-                        span.highlight()
-                    break
+        if not event.dblclick or event.inaxes is None:
+            return
 
-            self.canvas.draw()
+        logging.info(f"Mouse event at point: {event.xdata}")
+
+        self.mouse_event = event
+
+        ax = event.inaxes
+        for lead, manager in self.span_managers.items():
+            if manager.ax == ax:
+                # Find the span under the mouse cursor
+                for span in manager.get_spans():
+                    if span.onset <= event.xdata <= span.offset:
+                        if span.is_highlighted:
+                            span.remove_highlight()
+                            self.mouse_event = None
+                        else:
+                            span.highlight()
+
+        self.canvas.draw_idle()
 
     def _handle_key_press_event(self, event: KeyEvent):
         if self.mouse_event is None:
@@ -322,21 +349,23 @@ class ECGPlotHandler(tk.Frame, Observer):
             self._delete_selected_span()
 
     def _delete_selected_span(self):
-        if sum([len(x) for x in self.annotations_manager.annotations.values()]) == 0:
+
+        if sum([len(x.spans) for x in self.span_managers.values()]) == 0:
             return
 
         i = None
         selected_lead = self.mouse_event.inaxes.axes.get_title()
 
-        if len(self.annotations_manager.annotations[selected_lead]) == 0:
+        if len(self.span_managers[selected_lead].spans) == 0:
             return
 
-        for cnt, pos in enumerate(self.annotations_manager.annotations[selected_lead]):
+        for cnt, pos in enumerate(self.span_managers[selected_lead].spans):
             if pos.onset < self.mouse_event.xdata < pos.offset:
                 i = cnt
                 break
 
-        self.annotations_manager.annotations[selected_lead].pop(i).remove_artist()
+        self.span_managers[selected_lead].remove_span_by_index(i)
+        self.annotations_manager.annotations[selected_lead].pop(i)
 
         self.mouse_event = None
-        self.canvas.draw()
+        self.canvas.draw_idle()

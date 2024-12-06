@@ -52,7 +52,7 @@ class BottomFrame(tk.Frame):
         self.quit.pack(side=tk.RIGHT, padx=10, pady=10)
 
     def _override_qrs_complexes_from_annotations(self):
-        for lead, qrs_complexes in self.annotations_manager.to_qrs_complexes().items():
+        for lead, qrs_complexes in self.annotations_manager.annotations.items():
             self.app_variables.explorer.overwrite_annotations(lead, qrs_complexes)
 
     def _generate_report(self):
