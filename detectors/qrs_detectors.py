@@ -25,7 +25,6 @@ class PanTompkinsDetector:
     def __init__(self):
         self.window_size = 150  # PanTompkins processing window size = milliseconds
         self.min_peak_distance = 200  # milliseconds
-        self.max_qrs_width = 120  # milliseconds
 
     def detect(self, ecg: ECGContainer):
         for lead in ecg.ecg_leads:

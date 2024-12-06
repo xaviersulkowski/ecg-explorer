@@ -74,10 +74,6 @@ class ECGContainer:
         self.description: str = description
         self.file_path: str = file_path
 
-    @property
-    def n_leads(self):
-        return len(self.ecg_leads)
-
     def _sort_leads(self, ecg_leads: list[ECGLead]) -> list[ECGLead]:
         return [
             lead

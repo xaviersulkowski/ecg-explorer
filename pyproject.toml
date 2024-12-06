@@ -19,7 +19,11 @@ black = "^23.10.1"
 pyinstaller = "^6.2.0"
 pefile = "^2023.2.7"
 pywavelets = "^1.7.0"
+vulture = "^2.13"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.vulture]
+exclude = [".venv/", "venv/"]
